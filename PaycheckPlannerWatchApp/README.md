@@ -1,0 +1,1 @@
+This folder represents the watchOS app container. Add storyboard/Assets if you expand the watch app.
