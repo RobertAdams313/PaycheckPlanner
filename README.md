@@ -1,6 +1,3 @@
-Plan every paycheck. See which bills land on it, what’s left, and what can wait.
-
-
 Paycheck Planner shows you exactly where each paycheck is going—before it arrives. Set your pay schedule, add your bills, and see which ones fall into each pay period. You’ll get a clear breakdown of income vs. bills and how much you’ll have left.
 
 What it does
