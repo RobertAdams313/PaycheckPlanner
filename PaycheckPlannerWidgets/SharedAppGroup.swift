@@ -1,7 +1,7 @@
 import Foundation
 
 struct SharedAppGroup {
-    static let suite = "group.yourteam.PaycheckPlanner" // <- CHANGE THIS
+    static let suite = "group.com.RobAdams.PaycheckPlanner" // <- CHANGE THIS
     static let keyNext = "nextPaycheckSnapshot"
     static let keyNextList = "nextPaycheckSnapshotList"
     static let keyPaid = "paidBillIDs"

@@ -1,43 +1,78 @@
+//
+//  SettingsView.swift
+//  PaycheckPlanner
+//
+//  Created by Robert Adams on 8/24/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
+
+
 import SwiftUI
 
+/// Full replacement SettingsView with:
+/// - Liquid Glass toggle (iOS 26+ only)
+/// - Theme picker (System / Light / Dark)
+/// - iCloud Sync toggle (preference only; relaunch required to apply)
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var schedule: PaySchedule
-    @AppStorage("defaultUpcomingCount") private var defaultUpcomingCount: Int = 6
-    @AppStorage("autoPushToCalendar") private var autoPushToCalendar: Bool = false
-    @AppStorage("alertDaysBefore") private var alertDaysBefore: Int = 1
-    @AppStorage("alertHour") private var alertHour: Int = 8
-    @AppStorage("alertMinute") private var alertMinute: Int = 0
+    // Appearance
+    @AppStorage(kLiquidGlassEnabledKey) private var liquidGlassEnabled: Bool = true
+    @AppStorage("appTheme") private var appThemeRaw: String = "system" // "system" | "light" | "dark"
+
+    // Sync
+    @AppStorage("iCloudSyncEnabled") private var iCloudSyncEnabled: Bool = false
+    @State private var showRelaunchAlert: Bool = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Pay Schedule") {
-                    Picker("Frequency", selection: $schedule.frequency) { ForEach(PayFrequency.allCases) { Text($0.displayName).tag($0) } }
-                    DatePicker("Anchor payday", selection: $schedule.anchorDate, displayedComponents: [.date])
-                    if schedule.frequency == .semimonthly {
-                        Stepper("First day: \(schedule.semimonthlyFirstDay)", value: $schedule.semimonthlyFirstDay, in: 1...28)
-                        Stepper("Second day: \(schedule.semimonthlySecondDay)", value: $schedule.semimonthlySecondDay, in: 1...28)
+                // === APPEARANCE ===
+                Section("Appearance") {
+                    Toggle(isOn: $liquidGlassEnabled) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Liquid Glass (iOS 26+)")
+                            Text(isLiquidGlassAvailable
+                                 ? "Animated glass background"
+                                 : "Requires iOS 26+")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(!isLiquidGlassAvailable)
+
+                    Picker("Theme", selection: $appThemeRaw) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
                     }
                 }
-                Section("Base Income (optional)") {
-                    TextField("Per-paycheck base amount", value: $schedule.paycheckAmount, format: .currency(code: Locale.current.currency?.identifier ?? "USD")).keyboardType(.decimalPad)
-                    NavigationLink("Manage income sources") { IncomeSourcesView() }
-                }
-                Section("Calendar") {
-                    Toggle("Automatically add future paydays to Calendar", isOn: $autoPushToCalendar)
-                    Stepper("Alert days before: \(alertDaysBefore)", value: $alertDaysBefore, in: 0...7)
-                    HStack {
-                        Stepper("Hour: \(alertHour)", value: $alertHour, in: 0...23)
-                        Stepper("Minute: \(alertMinute)", value: $alertMinute, in: 0...55, step: 5)
+
+                // === SYNC ===
+                Section("Sync") {
+                    Toggle("iCloud Sync", isOn: Binding(
+                        get: { iCloudSyncEnabled },
+                        set: { newValue in
+                            iCloudSyncEnabled = newValue
+                            // Because the container is chosen at Scene creation time,
+                            // a relaunch is required to switch between local/CloudKit.
+                            showRelaunchAlert = true
+                        }
+                    ))
+                    .alert("Relaunch Required",
+                           isPresented: $showRelaunchAlert) {
+                        Button("OK") { }
+                    } message: {
+                        Text("Quit and relaunch the app to apply the iCloud sync setting.")
                     }
                 }
-                Section("Display") {
-                    Stepper("Future paychecks: \(defaultUpcomingCount)", value: $defaultUpcomingCount, in: 3...24, step: 3)
-                }
+
+                // === YOUR OTHER SETTINGS (re-add below) ===
+                // Section { ... }
             }
             .navigationTitle("Settings")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
         }
+    }
+
+    private var isLiquidGlassAvailable: Bool {
+        if #available(iOS 26, *) { return true } else { return false }
     }
 }

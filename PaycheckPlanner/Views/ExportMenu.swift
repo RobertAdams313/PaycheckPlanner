@@ -1,38 +1,118 @@
-import SwiftUI
-import UniformTypeIdentifiers
+//
+//  ExportMenu.swift
+//  PaycheckPlanner
+//
+//  Created by Robert Adams on 8/23/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
 
+
+import SwiftUI
+
+/// A simple export menu that generates a CSV and shares it via the iOS share sheet.
 struct ExportMenu: View {
+    let schedule: PaySchedule
     let bills: [Bill]
     let incomeSources: [IncomeSource]
-    let schedules: [PaySchedule]
-    @State private var csvURL: URL?
+
     var body: some View {
         Menu {
-            Button("Export CSV") { exportCSV() }
-            if let url = csvURL {
-                ShareLink(item: url, preview: SharePreview("PaycheckPlanner.csv"))
+            ShareLink(item: CSVBuilder.makeCSV(schedule: schedule, bills: bills, incomeSources: incomeSources)) {
+                Label("Export CSV", systemImage: "square.and.arrow.up")
             }
         } label: {
-            Label("Export", systemImage: "square.and.arrow.up")
+            Label("Export", systemImage: "arrow.up.doc")
+        }
+        .accessibilityLabel("Export data")
+    }
+}
+
+// MARK: - CSV Builder
+
+private enum CSVBuilder {
+    static func makeCSV(schedule: PaySchedule, bills: [Bill], incomeSources: [IncomeSource]) -> URL {
+        var rows: [String] = []
+
+        // Header
+        rows.append([
+            "Section",
+            "Name",
+            "Amount",
+            "Recurrence",
+            "RecurrenceEnd",
+            "Date",
+            "Extra"
+        ].joined(separator: ","))
+
+        // Schedule summary
+        let totalIncomePerPaycheck = incomeSources.reduce(Decimal(0)) { $0 + $1.defaultAmount }
+        rows.append([
+            "Schedule",
+            escape(schedule.frequency.displayName),
+            escape(totalIncomePerPaycheck.currencyString),
+            "",                  // Recurrence
+            "",                  // RecurrenceEnd
+            iso(schedule.anchorDate),
+            "Anchor payday"
+        ].joined(separator: ","))
+
+        // Income sources
+        for inc in incomeSources {
+            rows.append([
+                "Income",
+                escape(inc.name),
+                escape(inc.defaultAmount.currencyString),
+                "",      // Recurrence
+                "",      // RecurrenceEnd
+                "",      // Date
+                ""       // Extra / Notes (not present in model)
+            ].joined(separator: ","))
+        }
+
+        // Bills
+        for b in bills {
+            rows.append([
+                "Bill",
+                escape(b.name),
+                escape(b.amount.currencyString),
+                escape(b.recurrence.displayName),
+                "", // RecurrenceEnd (not in current model; leave blank)
+                iso(b.anchorDueDate),
+                "First due date"
+            ].joined(separator: ","))
+        }
+
+        let csv = rows.joined(separator: "\n")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PaycheckPlanner_Export_\(Int(Date().timeIntervalSince1970)).csv")
+
+        do {
+            try csv.data(using: .utf8)?.write(to: url, options: .atomic)
+        } catch {
+            // Best-effort: if writing fails, try a different filename
+            let fallback = FileManager.default.temporaryDirectory
+                .appendingPathComponent("PaycheckPlanner_Export.csv")
+            try? csv.data(using: .utf8)?.write(to: fallback, options: .atomic)
+            return fallback
+        }
+
+        return url
+    }
+
+    // MARK: helpers
+
+    private static func escape(_ s: String) -> String {
+        // CSV-safe: wrap with quotes if needed and escape inner quotes
+        if s.contains(",") || s.contains("\"") || s.contains("\n") {
+            return "\"\(s.replacingOccurrences(of: "\"", with: "\"\""))\""
+        } else {
+            return s
         }
     }
-    private func exportCSV() {
-        let headers = "Type,Name,Amount,Recurrence,AnchorDate,RecurrenceEnd,Notes\n"
-        var rows = ""
-        let df = ISO8601DateFormatter()
-        for b in bills {
-            rows += "Bill,\(b.name),\(b.amount),\(b.recurrence.rawValue),\(df.string(from: b.anchorDueDate)),\(b.recurrenceEnd != nil ? df.string(from: b.recurrenceEnd!) : ""),\(b.notes ?? "")\n"
-        }
-        for s in schedules {
-            rows += "Schedule,frequency=\(s.frequency.rawValue),base=\(s.paycheckAmount),anchor=\(df.string(from: s.anchorDate)),,\n"
-        }
-        for i in incomeSources {
-            rows += "Income,\(i.name),\(i.defaultAmount),,,"
-            rows += (i.notes ?? "") + "\n"
-        }
-        let data = Data((headers + rows).utf8)
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("PaycheckPlanner.csv")
-        try? data.write(to: url)
-        csvURL = url
+
+    private static func iso(_ date: Date) -> String {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate]
+        return f.string(from: date)
     }
 }

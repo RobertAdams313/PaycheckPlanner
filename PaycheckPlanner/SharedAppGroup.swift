@@ -1,62 +1,66 @@
+//
+//  SharedAppGroup.swift
+//  PaycheckPlanner
+//
+//  Created by Robert Adams on 8/23/25.
+//
+
+
 import Foundation
 
-struct SharedAppGroup {
-    static let suite = "group.yourteam.PaycheckPlanner" // <- CHANGE THIS
-    static let keyNext = "nextPaycheckSnapshot"
-    static let keyNextList = "nextPaycheckSnapshotList"
-    static let keyPaid = "paidBillIDs"
-    static let keyIndex = "snapshotIndex"
+enum SharedAppGroup {
+    // 🔧 Set this to your actual App Group ID
+    static let suite = "group.com.RobAdams.PaycheckPlanner"
+
+    // Use group defaults if available; otherwise fall back to standard so we never crash.
+    static var defaults: UserDefaults {
+        UserDefaults(suiteName: suite) ?? .standard
+    }
 
     struct Snapshot: Codable {
+        struct TopBill: Codable {
+            let name: String
+            let amount: Decimal
+            let dueDate: Date
+        }
         let payday: Date
         let income: Decimal
         let billsTotal: Decimal
         let leftover: Decimal
         let topBills: [TopBill]
-        struct TopBill: Codable { let name: String; let amount: Decimal; let dueDate: Date }
     }
 
-    static func save(snapshot: Snapshot) {
-        guard let data = try? JSONEncoder().encode(snapshot),
-              let ud = UserDefaults(suiteName: suite) else { return }
-        ud.set(data, forKey: keyNext)
-    }
-    static func load() -> Snapshot? {
-        guard let ud = UserDefaults(suiteName: suite),
-              let data = ud.data(forKey: keyNext),
-              let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return nil }
-        return snap
-    }
-    static func saveList(snapshots: [Snapshot]) {
-        guard let data = try? JSONEncoder().encode(snapshots),
-              let ud = UserDefaults(suiteName: suite) else { return }
-        ud.set(data, forKey: keyNextList)
-    }
-    static func loadList() -> [Snapshot] {
-        guard let ud = UserDefaults(suiteName: suite),
-              let data = ud.data(forKey: keyNextList),
-              let snaps = try? JSONDecoder().decode([Snapshot].self, from: data) else { return [] }
-        return snaps
-    }
     static func billID(_ name: String, _ due: Date) -> String {
-        let fmt = ISO8601DateFormatter()
-        return name + "::" + fmt.string(from: due)
+        let iso = ISO8601DateFormatter()
+        return "\(name)|\(iso.string(from: due))"
+    }
+
+    static func isPaid(_ id: String) -> Bool {
+        defaults.bool(forKey: "paid.\(id)")
     }
     static func setPaid(_ id: String, _ paid: Bool) {
-        guard let ud = UserDefaults(suiteName: suite) else { return }
-        var set = Set((ud.array(forKey: keyPaid) as? [String]) ?? [])
-        if paid { set.insert(id) } else { set.remove(id) }
-        ud.set(Array(set), forKey: keyPaid)
+        defaults.set(paid, forKey: "paid.\(id)")
     }
-    static func isPaid(_ id: String) -> Bool {
-        guard let ud = UserDefaults(suiteName: suite) else { return false }
-        let arr = (ud.array(forKey: keyPaid) as? [String]) ?? []
-        return Set(arr).contains(id)
+
+    static func getSnapshotIndex() -> Int {
+        max(0, defaults.integer(forKey: "snapshotIndex"))
     }
     static func setSnapshotIndex(_ idx: Int) {
-        UserDefaults(suiteName: suite)?.set(idx, forKey: keyIndex)
+        defaults.set(max(0, idx), forKey: "snapshotIndex")
     }
-    static func getSnapshotIndex() -> Int {
-        UserDefaults(suiteName: suite)?.integer(forKey: keyIndex) ?? 0
+
+    static func load() -> Snapshot? {
+        guard let data = defaults.data(forKey: "snapshot") else { return nil }
+        return try? JSONDecoder().decode(Snapshot.self, from: data)
+    }
+    static func save(_ snap: Snapshot) {
+        if let data = try? JSONEncoder().encode(snap) {
+            defaults.set(data, forKey: "snapshot")
+        }
+    }
+
+    static func containerURL() -> URL {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: suite)
+        ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 }

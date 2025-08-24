@@ -47,15 +47,27 @@ struct MarkBillPaidIntent: AppIntent {
 }
 
 // MARK: - Widget configuration intent (for configurable widgets)
+
+// ... your other intents (CyclePrev/Next, MarkBillPaidIntent) unchanged ...
+
+import AppIntents
+import WidgetKit
+
 struct PaycheckDisplayConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Paycheck Widget Options"
 
+    // Must be optional for WidgetConfigurationIntent
     @Parameter(title: "Show Mode")
-    var mode: Mode
+    var mode: Mode?
 
     init() {}
 
-    static var parameterSummary: some ParameterSummary { Summary("Show \\(.$mode)") }
+    // Use the key-path closure form to satisfy the generic requirement
+    static var parameterSummary: some ParameterSummary {
+        Summary {
+            \.$mode
+        }
+    }
 
     enum Mode: String, AppEnum, CaseDisplayRepresentable, Sendable {
         case leftoverOnly
@@ -70,4 +82,3 @@ struct PaycheckDisplayConfigIntent: WidgetConfigurationIntent {
         ]
     }
 }
-

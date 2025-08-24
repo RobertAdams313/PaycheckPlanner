@@ -20,14 +20,18 @@ struct NextPaycheckProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> Entry { .placeholder }
 
     func snapshot(for configuration: Intent, in context: Context) async -> Entry {
-        loadEntry() ?? .placeholder
+        // let mode = configuration.mode ?? .leftoverOnly  // use if you branch on mode later
+        return loadEntry() ?? .placeholder
     }
 
     func timeline(for configuration: Intent, in context: Context) async -> Timeline<Entry> {
+        // let mode = configuration.mode ?? .leftoverOnly
         let entry = loadEntry() ?? .placeholder
         let refresh = min(entry.payday, Date().addingTimeInterval(60*60))
         return Timeline(entries: [entry], policy: .after(refresh))
     }
+
+    // ... loadEntry() unchanged ...
 
     private func loadEntry() -> Entry? {
         if let snap = SharedAppGroup.load() {
