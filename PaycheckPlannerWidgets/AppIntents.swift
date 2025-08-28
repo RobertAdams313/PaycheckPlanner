@@ -1,15 +1,14 @@
 import AppIntents
 import WidgetKit
 
-// MARK: - Interactive intents (parameter-less for buttons)
-
+// Tap actions
 struct CyclePrevPaycheckIntent: AppIntent {
     static var title: LocalizedStringResource = "Previous Paycheck"
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let idx = SharedAppGroup.getSnapshotIndex()
         SharedAppGroup.setSnapshotIndex(max(0, idx - 1))
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "Previous period")
+        return .result(dialog: "Showing previous period")
     }
 }
 
@@ -19,66 +18,60 @@ struct CycleNextPaycheckIntent: AppIntent {
         let idx = SharedAppGroup.getSnapshotIndex()
         SharedAppGroup.setSnapshotIndex(idx + 1)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "Next period")
+        return .result(dialog: "Showing next period")
     }
 }
 
 struct MarkBillPaidIntent: AppIntent {
-    static var title: LocalizedStringResource = "Mark Bill Paid"
+    static var title: LocalizedStringResource = "Toggle Bill Paid"
 
-    @Parameter(title: "Bill ID") var billID: String
-    @Parameter(title: "Paid") var paid: Bool
+    @Parameter(title: "Bill ID")
+    var billID: String
 
     init() {}
 
-    // ✅ Assign the wrapped properties directly (not the backing _billID / _paid)
-    init(billID: String, paid: Bool) {
-        self.billID = billID
-        self.paid = paid
+    // Explicit initializer so Button(intent:) can pass IntentParameter<String>
+    init(billID: IntentParameter<String>) {
+        self._billID = billID
     }
 
-    static var authenticationPolicy: IntentAuthenticationPolicy { .requiresAuthentication }
+    static var parameterSummary: some ParameterSummary {
+        Summary("Toggle paid for \(\.$billID)")
+    }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        SharedAppGroup.setPaid(billID, paid)
+        let id = billID
+        let currentlyPaid = SharedAppGroup.isPaid(id)
+        SharedAppGroup.setPaid(id, !currentlyPaid)
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(dialog: "Bill updated")
+        return .result(dialog: currentlyPaid ? "Marked unpaid" : "Marked paid")
     }
 }
 
-// MARK: - Widget configuration intent (for configurable widgets)
+// Widget configuration intent
+enum PaycheckDisplayMode: String, AppEnum {
+    static var typeDisplayRepresentation =
+        TypeDisplayRepresentation(name: LocalizedStringResource("Display Mode"))
 
-// ... your other intents (CyclePrev/Next, MarkBillPaidIntent) unchanged ...
+    case leftoverOnly
+    case billsAndLeftover
 
-import AppIntents
-import WidgetKit
+    static var caseDisplayRepresentations: [Self: DisplayRepresentation] = [
+        .leftoverOnly:    DisplayRepresentation(title: LocalizedStringResource("Leftover Only")),
+        .billsAndLeftover: DisplayRepresentation(title: LocalizedStringResource("Bills + Leftover"))
+    ]
+
+    
+}
 
 struct PaycheckDisplayConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Paycheck Widget Options"
+    static var description = IntentDescription("Configure what the widget shows.")
 
-    // Must be optional for WidgetConfigurationIntent
-    @Parameter(title: "Show Mode")
-    var mode: Mode?
+    @Parameter(title: "Display")
+    var mode: PaycheckDisplayMode?
 
-    init() {}
-
-    // Use the key-path closure form to satisfy the generic requirement
     static var parameterSummary: some ParameterSummary {
-        Summary {
-            \.$mode
-        }
-    }
-
-    enum Mode: String, AppEnum, CaseDisplayRepresentable, Sendable {
-        case leftoverOnly
-        case incomeVsBills
-        case billsList
-
-        static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Mode")
-        static var caseDisplayRepresentations: [Mode: DisplayRepresentation] = [
-            .leftoverOnly: "Leftover only",
-            .incomeVsBills: "Income vs Bills",
-            .billsList: "Bills list"
-        ]
+        Summary("Show \(\.$mode)")
     }
 }

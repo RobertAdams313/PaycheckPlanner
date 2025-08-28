@@ -2,97 +2,170 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
+// MARK: - Timeline Entry
+
 struct NextPaycheckEntry: TimelineEntry {
-    let date: Date
-    let payday: Date
+    let date: Foundation.Date
+    let payday: Foundation.Date
     let income: Decimal
     let billsTotal: Decimal
     let leftover: Decimal
     let topBills: [SharedAppGroup.Snapshot.TopBill]
-    static let placeholder = NextPaycheckEntry(date: .now, payday: .now, income: 0, billsTotal: 0, leftover: 0, topBills: [])
+
+    static let placeholder = NextPaycheckEntry(
+        date: .now,
+        payday: .now,
+        income: 2500,
+        billsTotal: 1800,
+        leftover: 700,
+        topBills: [
+            .init(name: "Rent", amount: 1200, dueDate: .now),
+            .init(name: "Electric", amount: 120, dueDate: .now)
+        ]
+    )
 }
 
-// Use AppIntentTimelineProvider so the widget can be configured with an intent.
+// MARK: - Provider
+
 struct NextPaycheckProvider: AppIntentTimelineProvider {
-    typealias Intent = PaycheckDisplayConfigIntent
     typealias Entry = NextPaycheckEntry
+    typealias Intent = PaycheckDisplayConfigIntent
 
     func placeholder(in context: Context) -> Entry { .placeholder }
 
     func snapshot(for configuration: Intent, in context: Context) async -> Entry {
-        // let mode = configuration.mode ?? .leftoverOnly  // use if you branch on mode later
-        return loadEntry() ?? .placeholder
+        loadEntry() ?? .placeholder
     }
 
     func timeline(for configuration: Intent, in context: Context) async -> Timeline<Entry> {
-        // let mode = configuration.mode ?? .leftoverOnly
         let entry = loadEntry() ?? .placeholder
-        let refresh = min(entry.payday, Date().addingTimeInterval(60*60))
+        // Refresh by next payday or in an hour, whichever is sooner.
+        let refresh = min(entry.payday, Foundation.Date().addingTimeInterval(60 * 60))
         return Timeline(entries: [entry], policy: .after(refresh))
     }
 
-    // ... loadEntry() unchanged ...
-
     private func loadEntry() -> Entry? {
-        if let snap = SharedAppGroup.load() {
-            return Entry(date: Date(),
-                         payday: snap.payday,
-                         income: snap.income,
-                         billsTotal: snap.billsTotal,
-                         leftover: snap.leftover,
-                         topBills: snap.topBills)
-        }
-        return nil
+        guard let snap = SharedAppGroup.load() else { return nil }
+        return NextPaycheckEntry(
+            date: Foundation.Date(),
+            payday: snap.payday,
+            income: snap.income,
+            billsTotal: snap.billsTotal,
+            leftover: snap.leftover,
+            topBills: snap.topBills
+        )
     }
 }
 
+// MARK: - View
+
 struct NextPaycheckWidgetView: View {
-    var entry: NextPaycheckEntry
+    let entry: NextPaycheckProvider.Entry
+    @Environment(\.widgetFamily) private var family
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Next payday").font(.caption).foregroundStyle(.secondary)
-            Text(entry.payday, style: .date).font(.headline)
+        switch family {
+        case .systemSmall: compact
+        default: regular
+        }
+    }
 
-            HStack {
-                Text("Leftover").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Text(format(entry.leftover)).bold().monospacedDigit()
-                    .foregroundStyle(entry.leftover >= 0 ? .green : .red)
-            }
+    private var header: some View {
+        HStack(spacing: 8) {
+            Button(intent: CyclePrevPaycheckIntent(), label: {
+                Image(systemName: "chevron.backward")
+            })
+            Spacer()
+            Text(entry.payday, style: .date)
+                .font(.headline)
+                .minimumScaleFactor(0.8)
+            Spacer()
+            Button(intent: CycleNextPaycheckIntent(), label: {
+                Image(systemName: "chevron.forward")
+            })
+        }
+        .font(.caption)
+    }
 
+    private var totals: some View {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Button(intent: CyclePrevPaycheckIntent()) { Image(systemName: "chevron.backward") }
+                Text("Income")
                 Spacer()
-                Button(intent: CycleNextPaycheckIntent()) { Image(systemName: "chevron.forward") }
+                Text(format(entry.income)).monospacedDigit()
             }
-            .font(.caption)
+            HStack {
+                Text("Bills")
+                Spacer()
+                Text(format(entry.billsTotal)).monospacedDigit()
+            }
+            Divider().opacity(0.2)
+            HStack {
+                Text("Remaining").fontWeight(.semibold)
+                Spacer()
+                Text(format(entry.leftover)).monospacedDigit().fontWeight(.semibold)
+            }
+        }
+        .font(.caption)
+    }
+
+    private var regular: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header
+            totals
 
             if !entry.topBills.isEmpty {
                 Divider().opacity(0.2)
-                ForEach(entry.topBills.prefix(2), id: \.name) { b in
-                    let id = SharedAppGroup.billID(b.name, b.dueDate)
+                ForEach(entry.topBills.prefix(2), id: \.name) { bill in
+                    let id = SharedAppGroup.billID(bill.name, bill.dueDate)
                     HStack {
-                        Text(b.name).lineLimit(1)
+                        Text(bill.name).lineLimit(1)
                         Spacer()
-                        Text(format(b.amount)).monospacedDigit()
-                        Button(intent: MarkBillPaidIntent(billID: id, paid: !SharedAppGroup.isPaid(id))) {
-                            Image(systemName: SharedAppGroup.isPaid(id) ? "checkmark.circle.fill" : "circle")
-                        }
+                        Text(format(bill.amount)).monospacedDigit()
+
+                        // Use explicit label: initializer and an IntentParameter<String>
+                        Button(
+                            intent: MarkBillPaidIntent(billID: .init(title: displayName)),
+                            label: {
+                                Image(systemName: SharedAppGroup.isPaid(id) ? "checkmark.circle.fill" : "circle")
+                            }
+                        )
+                        .buttonStyle(.borderless)
                     }
-                    .font(.caption)
+                    .font(.caption2)
                 }
             }
         }
-        .containerBackground(for: .widget) { Color.clear }
-        .padding(12)
+        .padding(8)
     }
-    private func format(_ value: Decimal) -> String {
-        let f = NumberFormatter(); f.numberStyle = .currency; f.locale = .current
-        return f.string(from: value as NSDecimalNumber) ?? "$0"
+
+    private var compact: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            header
+            Text(format(entry.leftover))
+                .font(.title2).bold().monospacedDigit()
+            Text("Remaining")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(8)
+    }
+
+    private func format(_ amount: Decimal) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = Locale.current.currency?.identifier ?? "USD"
+        return f.string(from: amount as NSDecimalNumber) ?? "\(amount)"
     }
 }
 
+// MARK: - Widget
+
+@main
 struct NextPaycheckWidget: Widget {
+    private let displayName: LocalizedStringResource = LocalizedStringResource("Next Paycheck")
+    private let descriptionText: LocalizedStringResource = LocalizedStringResource("Shows your upcoming paycheck, bills, and remaining amount.")
+
     var body: some WidgetConfiguration {
         AppIntentConfiguration(
             kind: "NextPaycheckWidget",
@@ -101,8 +174,12 @@ struct NextPaycheckWidget: Widget {
         ) { entry in
             NextPaycheckWidgetView(entry: entry)
         }
-        .configurationDisplayName("Next Paycheck")
-        .description("Shows your next payday, leftover, and top bills.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryInline, .accessoryRectangular])
+        .configurationDisplayName(LocalizedStringResource(stringLiteral: "Next Paycheck"))
+        .description(LocalizedStringResource(stringLiteral: "Shows your upcoming paycheck, bills, and remaining amount."))
+
     }
 }
+private let displayName: LocalizedStringResource = LocalizedStringResource(stringLiteral: "Next Paycheck")
+private let descriptionText: LocalizedStringResource = LocalizedStringResource(stringLiteral: "Shows your upcoming paycheck, bills, and remaining amount.")
+
+// ...

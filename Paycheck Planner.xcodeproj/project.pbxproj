@@ -1,0 +1,868 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 63;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2900F75DAABB2E4671686721 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C74A89E577D94770819FC36A /* ContentView.swift */; };
+		3050D2A22E5A038C007416C0 /* Info-Watch.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3050D2A12E5A038C007416C0 /* Info-Watch.plist */; };
+		30EF32FA2E5B409F0009E58B /* LaunchScreen.storyboard in Sources */ = {isa = PBXBuildFile; fileRef = 30EF32F92E5B409C0009E58B /* LaunchScreen.storyboard */; };
+		505899DE1439E6C044FDAE18 /* NextPaycheckWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE7576606D1FBA1873F7B38 /* NextPaycheckWidget.swift */; };
+		78CF74402F6A87EB8843FB67 /* AppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279A48C0F8D1124A7B2A833A /* AppIntents.swift */; };
+		D4CBADE82E5FFE1900DEAE26 /* IncomeSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADE72E5FFE1900DEAE26 /* IncomeSource.swift */; };
+		D4CBADEA2E5FFE7300DEAE26 /* Bill.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADE92E5FFE7300DEAE26 /* Bill.swift */; };
+		D4CBADEC2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift in Resources */ = {isa = PBXBuildFile; fileRef = D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */; };
+		D4CBADEE2E5FFE9E00DEAE26 /* PayFrequency.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADED2E5FFE9E00DEAE26 /* PayFrequency.swift */; };
+		D4CBADF02E5FFEA900DEAE26 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADEF2E5FFEA900DEAE26 /* PlanView.swift */; };
+		D4CBADF22E5FFEB200DEAE26 /* IncomeSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF12E5FFEB200DEAE26 /* IncomeSourcesView.swift */; };
+		D4CBADF42E5FFEBD00DEAE26 /* IncomeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF32E5FFEBD00DEAE26 /* IncomeEditorView.swift */; };
+		D4CBADF62E5FFEC500DEAE26 /* BillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF52E5FFEC500DEAE26 /* BillsView.swift */; };
+		D4CBADF82E5FFECD00DEAE26 /* BillsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF72E5FFECD00DEAE26 /* BillsListView.swift */; };
+		D4CBADFA2E5FFED600DEAE26 /* BillEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF92E5FFED600DEAE26 /* BillEditorView.swift */; };
+		D4CBADFC2E5FFEE000DEAE26 /* AppBootstrapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADFB2E5FFEE000DEAE26 /* AppBootstrapView.swift */; };
+		D4CBADFE2E5FFF5300DEAE26 /* CurrencyInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADFD2E5FFF5300DEAE26 /* CurrencyInput.swift */; };
+		D4CBAE102E60030B00DEAE26 /* IncomeSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE0F2E60030B00DEAE26 /* IncomeSourcesView.swift */; };
+		D4CBAE122E60031700DEAE26 /* IncomeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE112E60031700DEAE26 /* IncomeEditorView.swift */; };
+		D4CBAE142E60035D00DEAE26 /* InsightsHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE132E60035D00DEAE26 /* InsightsHostView.swift */; };
+		D4CBAE162E60036A00DEAE26 /* InsightsChartSlice.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE152E60036A00DEAE26 /* InsightsChartSlice.swift */; };
+		D4CBAE1B2E6003B400DEAE26 /* AppBootstrapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE1A2E6003B400DEAE26 /* AppBootstrapView.swift */; };
+		D4CBAE1D2E60044A00DEAE26 /* PaycheckPlannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE1C2E60044A00DEAE26 /* PaycheckPlannerApp.swift */; };
+		D4CBAE272E600EBA00DEAE26 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D4CBAE262E600EBA00DEAE26 /* Info.plist */; };
+		D4CC258A2E5D9E130046C286 /* LiquidGlassBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CC25892E5D9E130046C286 /* LiquidGlassBackground.swift */; };
+		E17EDB1ABD45DE5F92DF9CF0 /* SharedAppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */; };
+		E8CCBA6F5C9DF1360F3541DD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5E4D6F5F9586F1EC432208AA /* README.md */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXBuildRule section */
+		D4CBAE1E2E6004BC00DEAE26 /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			fileType = pattern.proxy;
+			inputFiles = (
+			);
+			isEditable = 1;
+			outputFiles = (
+			);
+			script = "# Type a script or drag a script file from your workspace to insert its path.\n";
+		};
+/* End PBXBuildRule section */
+
+/* Begin PBXFileReference section */
+		279A48C0F8D1124A7B2A833A /* AppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntents.swift; sourceTree = "<group>"; };
+		3050D2A12E5A038C007416C0 /* Info-Watch.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-Watch.plist"; sourceTree = "<group>"; };
+		3050D2A32E5A0396007416C0 /* Info-Widget.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-Widget.plist"; sourceTree = "<group>"; };
+		30EF32F92E5B409C0009E58B /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		30FB5DA42E59A9B40044B04D /* PaycheckPlannerWatchApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PaycheckPlannerWatchApp.entitlements; sourceTree = "<group>"; };
+		48261DB7A6BB12DE6A9598E9 /* Paycheck PlannerWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Paycheck PlannerWidgets.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5E4D6F5F9586F1EC432208AA /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		6E24CCF0FCA9DB0CFE77A822 /* Paycheck PlannerWatchExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Paycheck PlannerWatchExtension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9DEE82AE0E2D10FA9130743B /* Paycheck Planner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Paycheck Planner.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedAppGroup.swift; sourceTree = "<group>"; };
+		C74A89E577D94770819FC36A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		CCE7576606D1FBA1873F7B38 /* NextPaycheckWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPaycheckWidget.swift; sourceTree = "<group>"; };
+		D4CBADE72E5FFE1900DEAE26 /* IncomeSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeSource.swift; sourceTree = "<group>"; };
+		D4CBADE92E5FFE7300DEAE26 /* Bill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bill.swift; sourceTree = "<group>"; };
+		D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bill+AnchorDueDate.swift"; sourceTree = "<group>"; };
+		D4CBADED2E5FFE9E00DEAE26 /* PayFrequency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PayFrequency.swift; sourceTree = "<group>"; };
+		D4CBADEF2E5FFEA900DEAE26 /* PlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
+		D4CBADF12E5FFEB200DEAE26 /* IncomeSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeSourcesView.swift; sourceTree = "<group>"; };
+		D4CBADF32E5FFEBD00DEAE26 /* IncomeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeEditorView.swift; sourceTree = "<group>"; };
+		D4CBADF52E5FFEC500DEAE26 /* BillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillsView.swift; sourceTree = "<group>"; };
+		D4CBADF72E5FFECD00DEAE26 /* BillsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillsListView.swift; sourceTree = "<group>"; };
+		D4CBADF92E5FFED600DEAE26 /* BillEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillEditorView.swift; sourceTree = "<group>"; };
+		D4CBADFB2E5FFEE000DEAE26 /* AppBootstrapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrapView.swift; sourceTree = "<group>"; };
+		D4CBADFD2E5FFF5300DEAE26 /* CurrencyInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyInput.swift; sourceTree = "<group>"; };
+		D4CBAE002E60000400DEAE26 /* NameAutoCapModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameAutoCapModifier.swift; sourceTree = "<group>"; };
+		D4CBAE092E6001F000DEAE26 /* DateUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateUtils.swift; sourceTree = "<group>"; };
+		D4CBAE0A2E6001FE00DEAE26 /* BudgetEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetEngine.swift; sourceTree = "<group>"; };
+		D4CBAE0B2E60021A00DEAE26 /* IncomeSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeSource.swift; sourceTree = "<group>"; };
+		D4CBAE0C2E60027E00DEAE26 /* Schedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Schedule.swift; sourceTree = "<group>"; };
+		D4CBAE0E2E6002B400DEAE26 /* PredefinedTags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PredefinedTags.swift; sourceTree = "<group>"; };
+		D4CBAE0F2E60030B00DEAE26 /* IncomeSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeSourcesView.swift; sourceTree = "<group>"; };
+		D4CBAE112E60031700DEAE26 /* IncomeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeEditorView.swift; sourceTree = "<group>"; };
+		D4CBAE132E60035D00DEAE26 /* InsightsHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsHostView.swift; sourceTree = "<group>"; };
+		D4CBAE152E60036A00DEAE26 /* InsightsChartSlice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsChartSlice.swift; sourceTree = "<group>"; };
+		D4CBAE182E60038B00DEAE26 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		D4CBAE192E60039700DEAE26 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		D4CBAE1A2E6003B400DEAE26 /* AppBootstrapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBootstrapView.swift; sourceTree = "<group>"; };
+		D4CBAE1C2E60044A00DEAE26 /* PaycheckPlannerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckPlannerApp.swift; sourceTree = "<group>"; };
+		D4CBAE1F2E60053500DEAE26 /* BudgetEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetEngineTests.swift; sourceTree = "<group>"; };
+		D4CBAE202E60055000DEAE26 /* TagClassificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagClassificationTests.swift; sourceTree = "<group>"; };
+		D4CBAE242E600E4000DEAE26 /* PaycheckPlannerWidgets 2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "PaycheckPlannerWidgets 2.entitlements"; sourceTree = "<group>"; };
+		D4CBAE252E600E8000DEAE26 /* WidgetExtension-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "WidgetExtension-Info.plist"; sourceTree = "<group>"; };
+		D4CBAE262E600EBA00DEAE26 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		D4CBAE292E6010FD00DEAE26 /* PaycheckPlanner2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PaycheckPlanner2.entitlements; sourceTree = "<group>"; };
+		D4CC25892E5D9E130046C286 /* LiquidGlassBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassBackground.swift; sourceTree = "<group>"; };
+		E559409DD9FF9D7AB3FE325F /* Paycheck PlannerWatchApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Paycheck PlannerWatchApp.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		12D98C762B5DDE046A8D3608 /* PaycheckPlannerWatchApp */ = {
+			isa = PBXGroup;
+			children = (
+				30FB5DA42E59A9B40044B04D /* PaycheckPlannerWatchApp.entitlements */,
+				5E4D6F5F9586F1EC432208AA /* README.md */,
+				3050D2A12E5A038C007416C0 /* Info-Watch.plist */,
+			);
+			path = PaycheckPlannerWatchApp;
+			sourceTree = "<group>";
+		};
+		3418DB1CD1CF037398488FCE /* PaycheckPlannerWatchExtension */ = {
+			isa = PBXGroup;
+			children = (
+				C74A89E577D94770819FC36A /* ContentView.swift */,
+			);
+			path = PaycheckPlannerWatchExtension;
+			sourceTree = "<group>";
+		};
+		7B0EC7D06D4B820A4962B026 /* PaycheckPlannerWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				3050D2A32E5A0396007416C0 /* Info-Widget.plist */,
+				279A48C0F8D1124A7B2A833A /* AppIntents.swift */,
+				CCE7576606D1FBA1873F7B38 /* NextPaycheckWidget.swift */,
+				9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */,
+				D4CBAE242E600E4000DEAE26 /* PaycheckPlannerWidgets 2.entitlements */,
+				D4CBAE252E600E8000DEAE26 /* WidgetExtension-Info.plist */,
+			);
+			path = PaycheckPlannerWidgets;
+			sourceTree = "<group>";
+		};
+		AA4E55A826E5809B3B1B0FAC /* Launch&Glass */ = {
+			isa = PBXGroup;
+			children = (
+				30EF32F92E5B409C0009E58B /* LaunchScreen.storyboard */,
+				D4CC25892E5D9E130046C286 /* LiquidGlassBackground.swift */,
+			);
+			path = "Launch&Glass";
+			sourceTree = "<group>";
+		};
+		B4AF9F2CC32F7213AD6358C7 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9DEE82AE0E2D10FA9130743B /* Paycheck Planner.app */,
+				E559409DD9FF9D7AB3FE325F /* Paycheck PlannerWatchApp.app */,
+				6E24CCF0FCA9DB0CFE77A822 /* Paycheck PlannerWatchExtension.appex */,
+				48261DB7A6BB12DE6A9598E9 /* Paycheck PlannerWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D4CBADFF2E5FFFFD00DEAE26 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE0C2E60027E00DEAE26 /* Schedule.swift */,
+				D4CBAE002E60000400DEAE26 /* NameAutoCapModifier.swift */,
+			);
+			path = Helpers;
+			sourceTree = "<group>";
+		};
+		D4CBAE012E60013300DEAE26 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE1A2E6003B400DEAE26 /* AppBootstrapView.swift */,
+				D4CBAE082E6001AC00DEAE26 /* Bills */,
+				D4CBAE072E60019500DEAE26 /* Insights */,
+				D4CBAE062E60018B00DEAE26 /* Income */,
+				D4CBAE052E60018300DEAE26 /* Plan */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		D4CBAE022E60014200DEAE26 /* Engines */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE1F2E60053500DEAE26 /* BudgetEngineTests.swift */,
+				D4CBAE0A2E6001FE00DEAE26 /* BudgetEngine.swift */,
+			);
+			path = Engines;
+			sourceTree = "<group>";
+		};
+		D4CBAE032E60014E00DEAE26 /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE092E6001F000DEAE26 /* DateUtils.swift */,
+			);
+			path = Utils;
+			sourceTree = "<group>";
+		};
+		D4CBAE042E60015D00DEAE26 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE0B2E60021A00DEAE26 /* IncomeSource.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		D4CBAE052E60018300DEAE26 /* Plan */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBADEF2E5FFEA900DEAE26 /* PlanView.swift */,
+			);
+			path = Plan;
+			sourceTree = "<group>";
+		};
+		D4CBAE062E60018B00DEAE26 /* Income */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE112E60031700DEAE26 /* IncomeEditorView.swift */,
+				D4CBAE0F2E60030B00DEAE26 /* IncomeSourcesView.swift */,
+			);
+			path = Income;
+			sourceTree = "<group>";
+		};
+		D4CBAE072E60019500DEAE26 /* Insights */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE152E60036A00DEAE26 /* InsightsChartSlice.swift */,
+				D4CBAE132E60035D00DEAE26 /* InsightsHostView.swift */,
+			);
+			path = Insights;
+			sourceTree = "<group>";
+		};
+		D4CBAE082E6001AC00DEAE26 /* Bills */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBADF92E5FFED600DEAE26 /* BillEditorView.swift */,
+				D4CBADF72E5FFECD00DEAE26 /* BillsListView.swift */,
+				D4CBADF52E5FFEC500DEAE26 /* BillsView.swift */,
+			);
+			path = Bills;
+			sourceTree = "<group>";
+		};
+		D4CBAE0D2E6002AA00DEAE26 /* Tags */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE202E60055000DEAE26 /* TagClassificationTests.swift */,
+				D4CBAE0E2E6002B400DEAE26 /* PredefinedTags.swift */,
+			);
+			path = Tags;
+			sourceTree = "<group>";
+		};
+		D4CBAE172E60037B00DEAE26 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE192E60039700DEAE26 /* SettingsView.swift */,
+				D4CBAE182E60038B00DEAE26 /* AppTheme.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		D4CBAE212E60065000DEAE26 /* Entitlements */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Entitlements;
+			sourceTree = "<group>";
+		};
+		EB99A7E989B136BFE70B6384 = {
+			isa = PBXGroup;
+			children = (
+				D4CBAE212E60065000DEAE26 /* Entitlements */,
+				D4CBADFB2E5FFEE000DEAE26 /* AppBootstrapView.swift */,
+				D4CBADE92E5FFE7300DEAE26 /* Bill.swift */,
+				D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */,
+				D4CBADFD2E5FFF5300DEAE26 /* CurrencyInput.swift */,
+				D4CBAE022E60014200DEAE26 /* Engines */,
+				D4CBADFF2E5FFFFD00DEAE26 /* Helpers */,
+				D4CBADF32E5FFEBD00DEAE26 /* IncomeEditorView.swift */,
+				D4CBADE72E5FFE1900DEAE26 /* IncomeSource.swift */,
+				D4CBADF12E5FFEB200DEAE26 /* IncomeSourcesView.swift */,
+				AA4E55A826E5809B3B1B0FAC /* Launch&Glass */,
+				D4CBAE042E60015D00DEAE26 /* Models */,
+				D4CBAE1C2E60044A00DEAE26 /* PaycheckPlannerApp.swift */,
+				12D98C762B5DDE046A8D3608 /* PaycheckPlannerWatchApp */,
+				3418DB1CD1CF037398488FCE /* PaycheckPlannerWatchExtension */,
+				7B0EC7D06D4B820A4962B026 /* PaycheckPlannerWidgets */,
+				D4CBADED2E5FFE9E00DEAE26 /* PayFrequency.swift */,
+				B4AF9F2CC32F7213AD6358C7 /* Products */,
+				D4CBAE172E60037B00DEAE26 /* Settings */,
+				D4CBAE0D2E6002AA00DEAE26 /* Tags */,
+				D4CBAE032E60014E00DEAE26 /* Utils */,
+				D4CBAE012E60013300DEAE26 /* Views */,
+				D4CBAE262E600EBA00DEAE26 /* Info.plist */,
+				D4CBAE292E6010FD00DEAE26 /* PaycheckPlanner2.entitlements */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		02072A1DAF48D464AA6126AF /* Paycheck PlannerWatchExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CAE83559503BD14ED147000D /* Build configuration list for PBXNativeTarget "Paycheck PlannerWatchExtension" */;
+			buildPhases = (
+				2B5AD5BC6F7F7A197B0F7E75 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Paycheck PlannerWatchExtension";
+			packageProductDependencies = (
+			);
+			productName = PaycheckPlannerWatchExtension;
+			productReference = 6E24CCF0FCA9DB0CFE77A822 /* Paycheck PlannerWatchExtension.appex */;
+			productType = "com.apple.product-type.watchkit2-extension";
+		};
+		4DC79432A705365146460650 /* Paycheck Planner */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8C6E187D0F76D64FCA84BC02 /* Build configuration list for PBXNativeTarget "Paycheck Planner" */;
+			buildPhases = (
+				666C85F3B0AEEDD3241454B1 /* Sources */,
+				C7745CF9175FE5FB49A5B4CD /* Resources */,
+			);
+			buildRules = (
+				D4CBAE1E2E6004BC00DEAE26 /* PBXBuildRule */,
+			);
+			dependencies = (
+			);
+			name = "Paycheck Planner";
+			packageProductDependencies = (
+				D4CC25AF2E5E5C6F0046C286 /* CoreXLSX */,
+			);
+			productName = PaycheckPlanner;
+			productReference = 9DEE82AE0E2D10FA9130743B /* Paycheck Planner.app */;
+			productType = "com.apple.product-type.application";
+		};
+		8D46CA3DB4B3CC9E2B161F5F /* Paycheck PlannerWatchApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F21C26E82111088F2954435F /* Build configuration list for PBXNativeTarget "Paycheck PlannerWatchApp" */;
+			buildPhases = (
+				D45A27F5BAAE2BC71258F33F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Paycheck PlannerWatchApp";
+			packageProductDependencies = (
+			);
+			productName = PaycheckPlannerWatchApp;
+			productReference = E559409DD9FF9D7AB3FE325F /* Paycheck PlannerWatchApp.app */;
+			productType = "com.apple.product-type.application.watchapp2";
+		};
+		B860F7EA8F6F89FB9394B49D /* Paycheck PlannerWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F89B1665E1978A7CD0A6555D /* Build configuration list for PBXNativeTarget "Paycheck PlannerWidgets" */;
+			buildPhases = (
+				07164D4897B568632F4B6397 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "Paycheck PlannerWidgets";
+			packageProductDependencies = (
+			);
+			productName = PaycheckPlannerWidgets;
+			productReference = 48261DB7A6BB12DE6A9598E9 /* Paycheck PlannerWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		54189BDC3EEC30E846E20F1C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				KnownAssetTags = (
+					New,
+				);
+				LastUpgradeCheck = 2600;
+				ORGANIZATIONNAME = "Rob Adams";
+			};
+			buildConfigurationList = 0E7EECC0F1FBEFA862EBCAD5 /* Build configuration list for PBXProject "Paycheck Planner" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EB99A7E989B136BFE70B6384;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D4CC25AE2E5E5C580046C286 /* XCRemoteSwiftPackageReference "CoreXLSX" */,
+			);
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4DC79432A705365146460650 /* Paycheck Planner */,
+				8D46CA3DB4B3CC9E2B161F5F /* Paycheck PlannerWatchApp */,
+				02072A1DAF48D464AA6126AF /* Paycheck PlannerWatchExtension */,
+				B860F7EA8F6F89FB9394B49D /* Paycheck PlannerWidgets */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C7745CF9175FE5FB49A5B4CD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D4CBAE272E600EBA00DEAE26 /* Info.plist in Resources */,
+				D4CBADEC2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D45A27F5BAAE2BC71258F33F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3050D2A22E5A038C007416C0 /* Info-Watch.plist in Resources */,
+				E8CCBA6F5C9DF1360F3541DD /* README.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		07164D4897B568632F4B6397 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				78CF74402F6A87EB8843FB67 /* AppIntents.swift in Sources */,
+				505899DE1439E6C044FDAE18 /* NextPaycheckWidget.swift in Sources */,
+				E17EDB1ABD45DE5F92DF9CF0 /* SharedAppGroup.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		2B5AD5BC6F7F7A197B0F7E75 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2900F75DAABB2E4671686721 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		666C85F3B0AEEDD3241454B1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D4CBAE102E60030B00DEAE26 /* IncomeSourcesView.swift in Sources */,
+				D4CBAE1B2E6003B400DEAE26 /* AppBootstrapView.swift in Sources */,
+				D4CBADFE2E5FFF5300DEAE26 /* CurrencyInput.swift in Sources */,
+				D4CBADFA2E5FFED600DEAE26 /* BillEditorView.swift in Sources */,
+				D4CBAE142E60035D00DEAE26 /* InsightsHostView.swift in Sources */,
+				D4CBAE1D2E60044A00DEAE26 /* PaycheckPlannerApp.swift in Sources */,
+				D4CBADF22E5FFEB200DEAE26 /* IncomeSourcesView.swift in Sources */,
+				D4CBADEA2E5FFE7300DEAE26 /* Bill.swift in Sources */,
+				D4CBAE162E60036A00DEAE26 /* InsightsChartSlice.swift in Sources */,
+				D4CBAE122E60031700DEAE26 /* IncomeEditorView.swift in Sources */,
+				D4CC258A2E5D9E130046C286 /* LiquidGlassBackground.swift in Sources */,
+				D4CBADEE2E5FFE9E00DEAE26 /* PayFrequency.swift in Sources */,
+				D4CBADE82E5FFE1900DEAE26 /* IncomeSource.swift in Sources */,
+				D4CBADF82E5FFECD00DEAE26 /* BillsListView.swift in Sources */,
+				D4CBADFC2E5FFEE000DEAE26 /* AppBootstrapView.swift in Sources */,
+				D4CBADF62E5FFEC500DEAE26 /* BillsView.swift in Sources */,
+				30EF32FA2E5B409F0009E58B /* LaunchScreen.storyboard in Sources */,
+				D4CBADF42E5FFEBD00DEAE26 /* IncomeEditorView.swift in Sources */,
+				D4CBADF02E5FFEA900DEAE26 /* PlanView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		1E92B3F7090BAD73930A4AE2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconMain;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlanner/PaycheckPlanner2.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = "PaycheckPlanner/Info-App.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.01;
+				OTHER_LDFLAGS = (
+					"-framework",
+					EventKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner;
+				PRODUCT_NAME = "Paycheck Planner";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		2DC8AF75E1D76618F28FD1BC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_COMPLICATION_NAME = Complication;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlannerWatchExtension/PaycheckPlannerWatchExtension.entitlements;
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner.watchapp.watchkitextension;
+				PRODUCT_NAME = "Paycheck PlannerWatchExtension";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		714D0984D81BB5EA8AFE5AFE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = WatchIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlannerWatchApp/PaycheckPlannerWatchApp.entitlements;
+				INFOPLIST_FILE = "Info-Watch.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner.watchapp;
+				PRODUCT_NAME = "Paycheck PlannerWatchApp";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+		82AA69C2E28367D2DDD96135 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlannerWidgets/PaycheckPlannerWidgets.entitlements;
+				INFOPLIST_FILE = "PaycheckPlannerWidgets/Info-Widget.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					WidgetKit,
+					"-framework",
+					AppIntents,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner.PaycheckPlannerWidgets;
+				PRODUCT_NAME = "Paycheck PlannerWidgets";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		A48517F1D3BAE22402CC93CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlannerWidgets/PaycheckPlannerWidgets.entitlements;
+				INFOPLIST_FILE = "PaycheckPlannerWidgets/Info-Widget.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					WidgetKit,
+					"-framework",
+					AppIntents,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner.PaycheckPlannerWidgets;
+				PRODUCT_NAME = "Paycheck PlannerWidgets";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A89FF162F9AB061BED76666E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = L8P8JEM9WL;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "";
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		B725F531B7C6016D916A3768 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_COMPLICATION_NAME = Complication;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlannerWatchExtension/PaycheckPlannerWatchExtension.entitlements;
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner.watchapp.watchkitextension;
+				PRODUCT_NAME = "Paycheck PlannerWatchExtension";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		CA99D10D9AEA931021AEE9B7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = L8P8JEM9WL;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "";
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		E4EAFCCBFBC8F10644DCC8AF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIconMain;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlanner/PaycheckPlanner2.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 5;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = "PaycheckPlanner/Info-App.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.01;
+				OTHER_LDFLAGS = (
+					"-framework",
+					EventKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner;
+				PRODUCT_NAME = "Paycheck Planner";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F2F76AAF5179638CA004D7D3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = WatchIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = PaycheckPlannerWatchApp/PaycheckPlannerWatchApp.entitlements;
+				INFOPLIST_FILE = "Info-Watch.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.RobAdams.PaycheckPlanner.watchapp;
+				PRODUCT_NAME = "Paycheck PlannerWatchApp";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0E7EECC0F1FBEFA862EBCAD5 /* Build configuration list for PBXProject "Paycheck Planner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A89FF162F9AB061BED76666E /* Debug */,
+				CA99D10D9AEA931021AEE9B7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8C6E187D0F76D64FCA84BC02 /* Build configuration list for PBXNativeTarget "Paycheck Planner" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E4EAFCCBFBC8F10644DCC8AF /* Debug */,
+				1E92B3F7090BAD73930A4AE2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		CAE83559503BD14ED147000D /* Build configuration list for PBXNativeTarget "Paycheck PlannerWatchExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B725F531B7C6016D916A3768 /* Debug */,
+				2DC8AF75E1D76618F28FD1BC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F21C26E82111088F2954435F /* Build configuration list for PBXNativeTarget "Paycheck PlannerWatchApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F2F76AAF5179638CA004D7D3 /* Debug */,
+				714D0984D81BB5EA8AFE5AFE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F89B1665E1978A7CD0A6555D /* Build configuration list for PBXNativeTarget "Paycheck PlannerWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A48517F1D3BAE22402CC93CF /* Debug */,
+				82AA69C2E28367D2DDD96135 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D4CC25AE2E5E5C580046C286 /* XCRemoteSwiftPackageReference "CoreXLSX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CoreOffice/CoreXLSX";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.14.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D4CC25AF2E5E5C6F0046C286 /* CoreXLSX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D4CC25AE2E5E5C580046C286 /* XCRemoteSwiftPackageReference "CoreXLSX" */;
+			productName = CoreXLSX;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 54189BDC3EEC30E846E20F1C /* Project object */;
+}
