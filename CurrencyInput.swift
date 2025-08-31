@@ -69,7 +69,7 @@ struct CurrencyInputModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .keyboardType(.numberPad) // Dial pad for currency entry
-            .onChange(of: text) { newValue in
+            .onChange(of: text) { oldValue, newValue in
                 // Reformat continuously as currency
                 text = CurrencyInput.formatted(from: newValue, currencyCode: currencyCode, locale: locale)
             }

@@ -11,25 +11,28 @@ import Foundation
 import SwiftData
 
 @Model
-final class IncomeSource: Identifiable {
+final class IncomeSource {
     @Attribute(.unique) var id: UUID
     var name: String
-    var amount: Double
-    /// Stored in lowercase: "weekly", "biweekly", "monthly"
-    var frequency: String
-    var startDate: Date
+
+    // Anchor date defines the first paycheck; frequency defines the recurrence (drives periods)
+    var anchorDate: Date
+    var frequency: RepeatFrequency
+
+    // Use Decimal for money, mark as transformable (Codable) for SwiftData
+    @Attribute(.transformable(by: .codable)) var baseIncome: Decimal
 
     init(
         id: UUID = UUID(),
         name: String,
-        amount: Double,
-        frequency: String,
-        startDate: Date
+        anchorDate: Date,
+        frequency: RepeatFrequency,
+        baseIncome: Decimal
     ) {
         self.id = id
         self.name = name
-        self.amount = amount
-        self.frequency = frequency.lowercased()
-        self.startDate = startDate
+        self.anchorDate = anchorDate
+        self.frequency = frequency
+        self.baseIncome = baseIncome
     }
 }

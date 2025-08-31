@@ -9,67 +9,67 @@
 
 import SwiftUI
 import SwiftData
+import Charts
+
+// MARK: - Chart mode
+
+enum InsightsChartMode: String, CaseIterable, Identifiable {
+    case bar = "Bar"
+    case pie = "Pie"
+    var id: String { rawValue }
+}
+
+// MARK: - Host
 
 struct InsightsHostView: View {
-    @Query(sort: \Bill.dueDate) private var bills: [Bill]
-    @State private var monthAnchor: Date = Date()
+    @Query(sort: \Bill.dueDate) private var allBills: [Bill]
 
-    private var monthBills: [Bill] {
-        let start = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: monthAnchor))!
-        let end = Calendar.current.date(byAdding: .month, value: 1, to: start)!
-        return bills.filter { $0.dueDate >= start && $0.dueDate < end }
+    /// Optional: when provided, the toggle can limit to just this interval.
+    let currentPeriod: DateInterval?
+
+    @State private var chartMode: InsightsChartMode = .bar
+    @State private var showOnlyCurrentPeriod: Bool = true
+
+    // Default-argument init so callers can do `InsightsHostView()`
+    init(currentPeriod: DateInterval? = nil) {
+        self.currentPeriod = currentPeriod
+    }
+
+    private var billsToShow: [Bill] {
+        guard showOnlyCurrentPeriod, let p = currentPeriod else { return allBills }
+        return Bill.bills(in: p, from: allBills)
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    InsightsChartView(bills: monthBills)
-
-                    // List by Tag (emoji + name)
-                    let grouped = Dictionary(grouping: monthBills, by: { $0.insightsTag })
-                    ForEach(grouped.keys.sorted(by: { $0.name < $1.name }), id: \.self) { tag in
-                        let total = grouped[tag]?.reduce(0) { $0 + $1.amount } ?? 0
-                        Section {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text("\(tag.emoji) \(tag.name)")
-                                    Spacer()
-                                    Text(total, format: .currency(code: "USD"))
-                                }
-                                .font(.headline)
-
-                                ForEach(grouped[tag]!, id: \.id) { bill in
-                                    HStack {
-                                        Text(bill.name)
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                        Text(bill.amount, format: .currency(code: "USD"))
-                                    }
-                                    .font(.subheadline)
-                                }
-                            }
-                            .padding()
-                            .background(.background.secondary)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .textCase(nil)
+        VStack(alignment: .leading, spacing: 12) {
+            // Controls
+            HStack(spacing: 12) {
+                Picker("Chart", selection: $chartMode) {
+                    ForEach(InsightsChartMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
                     }
                 }
-                .padding()
-            }
-            .navigationTitle("Insights")
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        monthAnchor = Calendar.current.date(byAdding: .month, value: -1, to: monthAnchor) ?? monthAnchor
-                    } label: { Image(systemName: "chevron.left") }
+                .pickerStyle(.segmented)
 
-                    Button {
-                        monthAnchor = Calendar.current.date(byAdding: .month, value: 1, to: monthAnchor) ?? monthAnchor
-                    } label: { Image(systemName: "chevron.right") }
+                if currentPeriod != nil {
+                    Toggle("This Period", isOn: $showOnlyCurrentPeriod)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .help("Show only bills that fall inside the current pay period")
                 }
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
+
+            // Chart content
+            switch chartMode {
+            case .bar:
+                InsightsChartSlice(bills: billsToShow)
+            case .pie:
+                InsightsPieSlice(bills: billsToShow)
+            }
         }
+        .navigationTitle("Insights")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

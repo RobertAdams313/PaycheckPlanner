@@ -7,6 +7,14 @@
 //
 
 
+//
+//  Bill.swift
+//  Paycheck Planner
+//
+//  Created by Rob on 8/27/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
+
 import Foundation
 import SwiftData
 
@@ -14,12 +22,13 @@ import SwiftData
 final class Bill: Identifiable {
     @Attribute(.unique) var id: UUID
     var name: String
-    var amount: Double
+    var amount: Double          // SwiftData supports Double directly
     var dueDate: Date
-    /// "weekly", "biweekly", "monthly", "yearly", "one-time"
+    /// Lowercased tokens like: "weekly", "biweekly", "monthly", "yearly", "one-time"
     var repeatFrequency: String
     /// Optional user category; if empty, we auto-tag by name for insights
     var category: String
+    var isPaid: Bool
 
     init(
         id: UUID = UUID(),
@@ -27,7 +36,8 @@ final class Bill: Identifiable {
         amount: Double,
         dueDate: Date,
         repeatFrequency: String,
-        category: String = ""
+        category: String = "",
+        isPaid: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -35,5 +45,6 @@ final class Bill: Identifiable {
         self.dueDate = dueDate
         self.repeatFrequency = repeatFrequency.lowercased()
         self.category = category
+        self.isPaid = isPaid
     }
 }

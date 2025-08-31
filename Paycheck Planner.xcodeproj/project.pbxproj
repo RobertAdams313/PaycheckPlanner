@@ -12,7 +12,11 @@
 		30EF32FA2E5B409F0009E58B /* LaunchScreen.storyboard in Sources */ = {isa = PBXBuildFile; fileRef = 30EF32F92E5B409C0009E58B /* LaunchScreen.storyboard */; };
 		505899DE1439E6C044FDAE18 /* NextPaycheckWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCE7576606D1FBA1873F7B38 /* NextPaycheckWidget.swift */; };
 		78CF74402F6A87EB8843FB67 /* AppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279A48C0F8D1124A7B2A833A /* AppIntents.swift */; };
-		D4CBADEC2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift in Resources */ = {isa = PBXBuildFile; fileRef = D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */; };
+		D4A50F4B2E60746400FD470D /* Bill.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADE92E5FFE7300DEAE26 /* Bill.swift */; };
+		D4A50F4E2E60750400FD470D /* ModelShims.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A50F4D2E60750400FD470D /* ModelShims.swift */; };
+		D4A50F502E607AA900FD470D /* InsightsPieSlice.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A50F4F2E607AA900FD470D /* InsightsPieSlice.swift */; };
+		D4A50F522E60808A00FD470D /* PaycheckPlannerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBAE1C2E60044A00DEAE26 /* PaycheckPlannerApp.swift */; };
+		D4A50F562E61160A00FD470D /* MoneyTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A50F552E61160A00FD470D /* MoneyTypes.swift */; };
 		D4CBADF02E5FFEA900DEAE26 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADEF2E5FFEA900DEAE26 /* PlanView.swift */; };
 		D4CBADF62E5FFEC500DEAE26 /* BillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF52E5FFEC500DEAE26 /* BillsView.swift */; };
 		D4CBADF82E5FFECD00DEAE26 /* BillsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4CBADF72E5FFECD00DEAE26 /* BillsListView.swift */; };
@@ -69,6 +73,11 @@
 		9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedAppGroup.swift; sourceTree = "<group>"; };
 		C74A89E577D94770819FC36A /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CCE7576606D1FBA1873F7B38 /* NextPaycheckWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextPaycheckWidget.swift; sourceTree = "<group>"; };
+		D4A50F4D2E60750400FD470D /* ModelShims.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelShims.swift; sourceTree = "<group>"; };
+		D4A50F4F2E607AA900FD470D /* InsightsPieSlice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsPieSlice.swift; sourceTree = "<group>"; };
+		D4A50F512E60805F00FD470D /* PaycheckPlannerApp 2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PaycheckPlannerApp 2.swift"; sourceTree = "<group>"; };
+		D4A50F552E61160A00FD470D /* MoneyTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyTypes.swift; sourceTree = "<group>"; };
+		D4A50F572E61181000FD470D /* BudgetSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetSummary.swift; sourceTree = "<group>"; };
 		D4CBADE72E5FFE1900DEAE26 /* IncomeSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IncomeSource.swift; sourceTree = "<group>"; };
 		D4CBADE92E5FFE7300DEAE26 /* Bill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bill.swift; sourceTree = "<group>"; };
 		D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Bill+AnchorDueDate.swift"; sourceTree = "<group>"; };
@@ -166,8 +175,9 @@
 		D4CBADFF2E5FFFFD00DEAE26 /* Helpers */ = {
 			isa = PBXGroup;
 			children = (
-				D4CBAE0C2E60027E00DEAE26 /* Schedule.swift */,
+				D4A50F552E61160A00FD470D /* MoneyTypes.swift */,
 				D4CBAE002E60000400DEAE26 /* NameAutoCapModifier.swift */,
+				D4CBAE0C2E60027E00DEAE26 /* Schedule.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -187,8 +197,8 @@
 		D4CBAE022E60014200DEAE26 /* Engines */ = {
 			isa = PBXGroup;
 			children = (
-				D4CBAE1F2E60053500DEAE26 /* BudgetEngineTests.swift */,
 				D4CBAE0A2E6001FE00DEAE26 /* BudgetEngine.swift */,
+				D4CBAE1F2E60053500DEAE26 /* BudgetEngineTests.swift */,
 			);
 			path = Engines;
 			sourceTree = "<group>";
@@ -204,7 +214,10 @@
 		D4CBAE042E60015D00DEAE26 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				D4CBADE92E5FFE7300DEAE26 /* Bill.swift */,
+				D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */,
 				D4CBAE0B2E60021A00DEAE26 /* IncomeSource.swift */,
+				D4A50F4D2E60750400FD470D /* ModelShims.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -231,6 +244,7 @@
 			children = (
 				D4CBAE152E60036A00DEAE26 /* InsightsChartSlice.swift */,
 				D4CBAE132E60035D00DEAE26 /* InsightsHostView.swift */,
+				D4A50F4F2E607AA900FD470D /* InsightsPieSlice.swift */,
 			);
 			path = Insights;
 			sourceTree = "<group>";
@@ -248,8 +262,8 @@
 		D4CBAE0D2E6002AA00DEAE26 /* Tags */ = {
 			isa = PBXGroup;
 			children = (
-				D4CBAE202E60055000DEAE26 /* TagClassificationTests.swift */,
 				D4CBAE0E2E6002B400DEAE26 /* PredefinedTags.swift */,
+				D4CBAE202E60055000DEAE26 /* TagClassificationTests.swift */,
 			);
 			path = Tags;
 			sourceTree = "<group>";
@@ -257,8 +271,8 @@
 		D4CBAE172E60037B00DEAE26 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				D4CBAE192E60039700DEAE26 /* SettingsView.swift */,
 				D4CBAE182E60038B00DEAE26 /* AppTheme.swift */,
+				D4CBAE192E60039700DEAE26 /* SettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -273,11 +287,11 @@
 		D4FA49E22E60170800B7C99A /* Icon */ = {
 			isa = PBXGroup;
 			children = (
-				D4FA49DA2E6016E900B7C99A /* AppMarkTinted.png */,
 				D4FA49D62E6016E900B7C99A /* AppIconDark.png */,
 				D4FA49D72E6016E900B7C99A /* AppIconTinted.png */,
 				D4FA49D82E6016E900B7C99A /* AppMark.png */,
 				D4FA49D92E6016E900B7C99A /* AppMarkDark.png */,
+				D4FA49DA2E6016E900B7C99A /* AppMarkTinted.png */,
 			);
 			path = Icon;
 			sourceTree = "<group>";
@@ -285,21 +299,23 @@
 		EB99A7E989B136BFE70B6384 = {
 			isa = PBXGroup;
 			children = (
-				D4CBAE212E60065000DEAE26 /* Entitlements */,
+				D4A50F572E61181000FD470D /* BudgetSummary.swift */,
 				D4CBADFB2E5FFEE000DEAE26 /* AppBootstrapView.swift */,
-				D4CBADE92E5FFE7300DEAE26 /* Bill.swift */,
-				D4CBADEB2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift */,
+				D4FA49DB2E6016E900B7C99A /* Assets.xcassets */,
 				D4CBADFD2E5FFF5300DEAE26 /* CurrencyInput.swift */,
 				D4CBAE022E60014200DEAE26 /* Engines */,
+				D4CBAE212E60065000DEAE26 /* Entitlements */,
 				D4CBADFF2E5FFFFD00DEAE26 /* Helpers */,
+				D4FA49E22E60170800B7C99A /* Icon */,
 				D4CBADF32E5FFEBD00DEAE26 /* IncomeEditorView.swift */,
 				D4CBADE72E5FFE1900DEAE26 /* IncomeSource.swift */,
 				D4CBADF12E5FFEB200DEAE26 /* IncomeSourcesView.swift */,
-				D4FA49E22E60170800B7C99A /* Icon */,
-				D4FA49DB2E6016E900B7C99A /* Assets.xcassets */,
+				D4CBAE262E600EBA00DEAE26 /* Info.plist */,
 				AA4E55A826E5809B3B1B0FAC /* Launch&Glass */,
 				D4CBAE042E60015D00DEAE26 /* Models */,
+				D4CBAE292E6010FD00DEAE26 /* PaycheckPlanner.entitlements */,
 				D4CBAE1C2E60044A00DEAE26 /* PaycheckPlannerApp.swift */,
+				D4A50F512E60805F00FD470D /* PaycheckPlannerApp 2.swift */,
 				12D98C762B5DDE046A8D3608 /* PaycheckPlannerWatchApp */,
 				3418DB1CD1CF037398488FCE /* PaycheckPlannerWatchExtension */,
 				7B0EC7D06D4B820A4962B026 /* PaycheckPlannerWidgets */,
@@ -309,8 +325,6 @@
 				D4CBAE0D2E6002AA00DEAE26 /* Tags */,
 				D4CBAE032E60014E00DEAE26 /* Utils */,
 				D4CBAE012E60013300DEAE26 /* Views */,
-				D4CBAE262E600EBA00DEAE26 /* Info.plist */,
-				D4CBAE292E6010FD00DEAE26 /* PaycheckPlanner.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
@@ -436,7 +450,6 @@
 				D4FA49DF2E6016EA00B7C99A /* AppMarkDark.png in Resources */,
 				D4FA49E02E6016EA00B7C99A /* AppIconTinted.png in Resources */,
 				D4FA49E12E6016EA00B7C99A /* AppMarkTinted.png in Resources */,
-				D4CBADEC2E5FFE8A00DEAE26 /* Bill+AnchorDueDate.swift in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -474,15 +487,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4A50F522E60808A00FD470D /* PaycheckPlannerApp.swift in Sources */,
 				D4FA49F52E6024C000B7C99A /* Bill+AnchorDueDate.swift in Sources */,
 				D4FA49F62E6024C000B7C99A /* CurrencyInput.swift in Sources */,
 				D4FA49F02E60248400B7C99A /* SettingsView.swift in Sources */,
 				D4FA49F12E60248400B7C99A /* AppTheme.swift in Sources */,
+				D4A50F4B2E60746400FD470D /* Bill.swift in Sources */,
 				D4FA49F32E60248400B7C99A /* PredefinedTags.swift in Sources */,
 				D4FA49F42E60248400B7C99A /* DateUtils.swift in Sources */,
+				D4A50F562E61160A00FD470D /* MoneyTypes.swift in Sources */,
 				D4FA49EE2E60246B00B7C99A /* IncomeSource.swift in Sources */,
 				D4FA49EA2E60245F00B7C99A /* NameAutoCapModifier.swift in Sources */,
 				D4FA49E82E60245400B7C99A /* BudgetEngine.swift in Sources */,
+				D4A50F502E607AA900FD470D /* InsightsPieSlice.swift in Sources */,
 				D4CBAE102E60030B00DEAE26 /* IncomeSourcesView.swift in Sources */,
 				D4CBAE1B2E6003B400DEAE26 /* AppBootstrapView.swift in Sources */,
 				D4CBADFA2E5FFED600DEAE26 /* BillEditorView.swift in Sources */,
@@ -494,6 +511,7 @@
 				D4CBADF62E5FFEC500DEAE26 /* BillsView.swift in Sources */,
 				30EF32FA2E5B409F0009E58B /* LaunchScreen.storyboard in Sources */,
 				D4CBADF02E5FFEA900DEAE26 /* PlanView.swift in Sources */,
+				D4A50F4E2E60750400FD470D /* ModelShims.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

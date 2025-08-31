@@ -1,11 +1,19 @@
 //
+//  BudgetSummary.swift
+//  Paycheck Planner
+//
+//  Created by Rob on 8/28/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
+
+
+//
 //  PeriodSummary.swift
 //  Paycheck Planner
 //
 //  Created by Rob on 8/27/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
+//  © 2025 Rob Adams. All rights reserved.
 //
-
 
 //
 //  PeriodSummary.swift

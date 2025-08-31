@@ -17,7 +17,7 @@ struct NameAutoCapModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .textInputAutocapitalization(.words)
-            .onChange(of: text) { newValue in
+            .onChange(of: text) { newValue, oldValue in
                 // Normalize to localized title casing (capitalizes after spaces).
                 let normalized = newValue.localizedCapitalized
                 if normalized != newValue {
