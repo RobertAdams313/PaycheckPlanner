@@ -18,12 +18,13 @@
 import SwiftUI
 import SwiftData
 
-/// Bills list + Add (+) button. Adds Calendar push toggle & “Push Now”.
+/// Bills list + Add (+) button. Calendar push toggle & “Push Now”. Sorting restored.
 struct BillsView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.modelContext) private var context
 
-    @Query(sort: \Bill.anchorDueDate, order: .forward) private var bills: [Bill]
+    @Query(sort: \Bill.anchorDueDate, order: .forward)
+    private var bills: [Bill]
 
     @State private var editingBill: Bill?
     @State private var showEditor = false
@@ -31,14 +32,39 @@ struct BillsView: View {
     @AppStorage("pushBillsToCalendar") private var pushBillsToCalendar: Bool = false
     @AppStorage("billAlertDaysBefore") private var billAlertDaysBefore: Int = 1
 
+    // Persisted sort mode (Next Due Date by default)
+    @AppStorage("billsSortMode")
+    private var sortModeRaw: Int = BillsSortMode.nextDueDate.rawValue
+
+    private var sortMode: BillsSortMode {
+        BillsSortMode(rawValue: sortModeRaw) ?? .nextDueDate
+    }
+
+    // One place to order the list
+    private var sortedBills: [Bill] {
+        switch sortMode {
+        case .nextDueDate:
+            return bills.sorted { $0.anchorDueDate < $1.anchorDueDate }
+        case .category:
+            // Empty category sorts last (tilde trick)
+            return bills.sorted {
+                let l = $0.category.isEmpty ? "~" : $0.category
+                let r = $1.category.isEmpty ? "~" : $1.category
+                if l.caseInsensitiveCompare(r) == .orderedSame {
+                    return $0.anchorDueDate < $1.anchorDueDate
+                }
+                return l.localizedCaseInsensitiveCompare(r) == .orderedAscending
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                if bills.isEmpty {
+                if sortedBills.isEmpty {
                     Section {
                         VStack(spacing: 8) {
-                            Text("No bills yet")
-                                .font(.headline)
+                            Text("No bills yet").font(.headline)
                             Text("Tap the + button to add your first bill.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
@@ -47,10 +73,8 @@ struct BillsView: View {
                         .padding(.vertical, 24)
                     }
                 } else {
-                    ForEach(bills) { bill in
-                        Button {
-                            editingBill = bill
-                        } label: {
+                    ForEach(sortedBills) { bill in
+                        Button { editingBill = bill } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(bill.name).font(.body)
@@ -70,25 +94,34 @@ struct BillsView: View {
             }
             .navigationTitle("Bills")
             .toolbar {
+                // Calendar push menu
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Toggle("Push Bills to Calendar", isOn: $pushBillsToCalendar)
-                        Stepper("Alert \(billAlertDaysBefore) day(s) before", value: $billAlertDaysBefore, in: 0...14)
+                        Stepper("Alert \(billAlertDaysBefore) day(s) before",
+                                value: $billAlertDaysBefore,
+                                in: 0...14)
+                        Divider()
+                        // Sorting control (restores earlier enhancement)
+                        Picker("Sort Bills", selection: $sortModeRaw) {
+                            ForEach(BillsSortMode.allCases, id: \.rawValue) { mode in
+                                Text(mode.label).tag(mode.rawValue)
+                            }
+                        }
                         Divider()
                         Button("Push Now") { pushBillsNow() }
                     } label: {
                         Image(systemName: "calendar.badge.plus")
                     }
                 }
+                // Add (+)
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showEditor = true
-                    } label: {
+                    Button { showEditor = true } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
-            // New bill (BillEditorView expects a non-optional Bill and no onComplete:)
+            // New bill
             .sheet(isPresented: $showEditor) {
                 BillEditorView(bill: Bill())
             }
@@ -103,7 +136,6 @@ struct BillsView: View {
     }
 
     // MARK: - Calendar push
-
     private func pushBillsNow() {
         Task {
             do {
@@ -117,9 +149,22 @@ struct BillsView: View {
                     )
                 }
             } catch {
-                // Silently ignore for now; could show a toast/toaster view
+                // Silently ignore for now; could show a toast
                 print("Calendar push failed: \(error)")
             }
+        }
+    }
+}
+
+// MARK: - Local sort enum (scoped to avoid redeclarations elsewhere)
+private enum BillsSortMode: Int, CaseIterable {
+    case nextDueDate = 0
+    case category = 1
+
+    var label: String {
+        switch self {
+        case .nextDueDate: return "Next Due Date"
+        case .category:    return "Category"
         }
     }
 }

@@ -29,11 +29,11 @@ struct ContentView: View {
                 .tag(MainTab.plan)
 
             // BILLS
-            NavigationStack { BillsListView() }
+            NavigationStack { BillsView() }
                 .tabItem { Label("Bills", systemImage: "list.bullet.rectangle") }
                 .tag(MainTab.bills)
 
-            // INCOME
+            // Income tab -> use the drop-in IncomeSourcesView below (adds + and editor)
             NavigationStack { IncomeSourcesView() }
                 .tabItem { Label("Income", systemImage: "banknote") }
                 .tag(MainTab.income)

@@ -50,16 +50,17 @@ struct IncomeEditorView: View {
             Section("Pay Schedule") {
                 Picker("Frequency", selection: $frequency) {
                     ForEach(PayFrequency.allCases) { f in
-                        Text(f.uiName).tag(f)
+                        Text(uiName(for: f)).tag(f)
                     }
                 }
 
                 switch frequency {
                 case .once, .weekly, .biweekly, .monthly:
-                    DatePicker(frequency == .once ? "Pay date"
-                                                  : "Anchor date",
-                               selection: $anchorDate,
-                               displayedComponents: .date)
+                    DatePicker(
+                        frequency == .once ? "Pay date" : "Anchor date",
+                        selection: $anchorDate,
+                        displayedComponents: .date
+                    )
 
                 case .semimonthly:
                     Stepper("First day: \(semiFirst)", value: $semiFirst, in: 1...28)
@@ -70,9 +71,8 @@ struct IncomeEditorView: View {
         .navigationTitle(existing == nil ? "New Income" : "Edit Income")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    onComplete(false)
-                    dismiss()
+                Button("Cancel", role: .cancel) {
+                    onComplete(false); dismiss()
                 }
             }
             ToolbarItem(placement: .confirmationAction) {
@@ -118,22 +118,34 @@ struct IncomeEditorView: View {
 
             if let sched = src.schedule {
                 applyScheduleEdits(to: sched)
+                // ensure back-link (in case it was missing)
+                if sched.source == nil { sched.source = src }
             } else {
                 let sched = IncomeSchedule()
                 applyScheduleEdits(to: sched)
                 context.insert(sched)
+                // set BOTH sides
                 src.schedule = sched
+                sched.source = src
             }
         } else {
             // Create new
-            let src = IncomeSource(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                                   defaultAmount: amount,
-                                   variable: variable)
+            let src = IncomeSource(
+                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+                defaultAmount: amount,
+                variable: variable
+            )
+
             let sched = IncomeSchedule()
             applyScheduleEdits(to: sched)
-            context.insert(sched)
-            src.schedule = sched
+
+            // Insert before linking (safer for SwiftData to track)
             context.insert(src)
+            context.insert(sched)
+
+            // set BOTH sides
+            src.schedule = sched
+            sched.source = src
         }
 
         do {
@@ -141,6 +153,7 @@ struct IncomeEditorView: View {
             onComplete(true)
             dismiss()
         } catch {
+            print("Failed to save income: \(error)")
             showSaveError = true
             onComplete(false)
         }
@@ -151,18 +164,24 @@ struct IncomeEditorView: View {
         switch frequency {
         case .once, .weekly, .biweekly, .monthly:
             sched.anchorDate = anchorDate
+            // reset semimonthly days
+            sched.semimonthlyFirstDay = 1
+            sched.semimonthlySecondDay = 15
+
         case .semimonthly:
-            // Keep anchorDate for consistency (not used by stride logic),
-            // but store the two semimonthly days.
             sched.anchorDate = anchorDate
             sched.semimonthlyFirstDay = semiFirst
             sched.semimonthlySecondDay = semiSecond
         }
     }
-}
 
-// Convenience accessors if you used these previously
-private extension IncomeSchedule {
-    var semiMonthlyFirst: Int { semimonthlyFirstDay }
-    var semiMonthlySecond: Int { semimonthlySecondDay }
+    private func uiName(for f: PayFrequency) -> String {
+        switch f {
+        case .once:        return "Once"
+        case .weekly:      return "Weekly"
+        case .biweekly:    return "Every 2 Weeks"
+        case .semimonthly: return "Twice a Month"
+        case .monthly:     return "Monthly"
+        }
+    }
 }

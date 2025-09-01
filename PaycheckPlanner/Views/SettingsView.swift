@@ -73,6 +73,6 @@ struct SettingsView: View {
     }
 
     private var isLiquidGlassAvailable: Bool {
-        if #available(iOS 26, *) { return true } else { return false }
+        if #available(iOS 18, *) { return true } else { return false }
     }
 }

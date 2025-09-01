@@ -25,14 +25,12 @@ struct BillEditorView: View {
     // SwiftData model
     @Bindable var bill: Bill
 
-    // Currency formatting for amount
-    private let amountFormatter: NumberFormatter = {
-        let f = NumberFormatter()
-        f.numberStyle = .currency
-        f.maximumFractionDigits = 2
-        f.minimumFractionDigits = 0
-        return f
-    }()
+    @State private var showSaveError = false
+
+    private var canSave: Bool {
+        !bill.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        bill.amount >= 0 // change to > 0 if you want to require positive
+    }
 
     var body: some View {
         Form {
@@ -41,18 +39,16 @@ struct BillEditorView: View {
                 TextField("Name", text: $bill.name)
                     .textInputAutocapitalization(.words)
 
-                // Amount (Decimal) bound through string formatter bridge
+                // Match IncomeEditorView’s currency behavior
                 HStack {
                     Text("Amount")
                     Spacer()
-                    DecimalField(value: $bill.amount, formatter: amountFormatter)
-                        .multilineTextAlignment(.trailing)
-                        .keyboardType(.decimalPad)
+                    CurrencyAmountField(amount: $bill.amount)
                         .frame(maxWidth: 160)
                 }
                 .accessibilityElement(children: .combine)
 
-                // NEW: Category picker (binds to bill.category String)
+                // Category picker (binds to bill.category String)
                 CategoryPicker(category: $bill.category)
             }
 
@@ -68,56 +64,39 @@ struct BillEditorView: View {
                 .pickerStyle(.menu)
 
                 // Anchor / due date (first occurrence)
-                DatePicker("Anchor Due Date", selection: $bill.anchorDueDate, displayedComponents: .date)
+                DatePicker("Anchor Due Date",
+                           selection: $bill.anchorDueDate,
+                           displayedComponents: .date)
             }
         }
         .navigationTitle(bill.name.isEmpty ? "New Bill" : bill.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel", role: .cancel) { dismiss() }
+            }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    try? context.save()
-                    dismiss()
-                }
-                .bold()
+                Button("Done", action: save)
+                    .bold()
+                    .disabled(!canSave)
             }
         }
-    }
-}
-
-// MARK: - Decimal text field helper
-
-/// Minimal decimal text field that binds to a Decimal via NumberFormatter.
-/// Avoids accidental locale pitfalls and preserves monospaced digits.
-private struct DecimalField: View {
-    @Binding var value: Decimal
-    let formatter: NumberFormatter
-    @State private var text: String = ""
-
-    init(value: Binding<Decimal>, formatter: NumberFormatter) {
-        self._value = value
-        self.formatter = formatter
-        _text = State(initialValue: formatter.string(from: value.wrappedValue as NSDecimalNumber) ?? "")
+        .alert("Couldn’t Save Bill", isPresented: $showSaveError) {
+            Button("OK", role: .cancel) {}
+        } message: { Text("Please try again.") }
     }
 
-    var body: some View {
-        TextField("0", text: $text)
-            .font(.system(.body, design: .monospaced))
-            .onChange(of: text) { new in
-                // Parse; tolerate empty and partial input
-                let cleaned = new.trimmingCharacters(in: .whitespacesAndNewlines)
-                if cleaned.isEmpty {
-                    value = 0
-                } else if let num = formatter.number(from: cleaned) {
-                    value = num.decimalValue
-                }
-            }
-            .onAppear {
-                text = formatter.string(from: value as NSDecimalNumber) ?? ""
-            }
-            .onChange(of: value) { newValue in
-                let s = formatter.string(from: newValue as NSDecimalNumber) ?? ""
-                if s != text { text = s }
-            }
+    private func save() {
+        // Insert if new
+        if bill.persistentModelID == nil {
+            context.insert(bill)
+        }
+        do {
+            try context.save()
+            dismiss()
+        } catch {
+            print("Failed to save bill: \(error)")
+            showSaveError = true
+        }
     }
 }

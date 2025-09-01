@@ -54,6 +54,7 @@
 		D4A4B1512E65C22600E62BF3 /* CategoryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1502E65C22600E62BF3 /* CategoryPicker.swift */; };
 		D4A4B1532E65C29900E62BF3 /* PreviousPeriodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1522E65C29900E62BF3 /* PreviousPeriodsView.swift */; };
 		D4A4B1552E65C95F00E62BF3 /* DateSpan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */; };
+		D4A4B1592E65ED4100E62BF3 /* DataRepair.swift in Resources */ = {isa = PBXBuildFile; fileRef = D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */; };
 		E17EDB1ABD45DE5F92DF9CF0 /* SharedAppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */; };
 		E8CCBA6F5C9DF1360F3541DD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5E4D6F5F9586F1EC432208AA /* README.md */; };
 /* End PBXBuildFile section */
@@ -114,6 +115,7 @@
 		D4A4B1502E65C22600E62BF3 /* CategoryPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPicker.swift; sourceTree = "<group>"; };
 		D4A4B1522E65C29900E62BF3 /* PreviousPeriodsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviousPeriodsView.swift; sourceTree = "<group>"; };
 		D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateSpan.swift; sourceTree = "<group>"; };
+		D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepair.swift; sourceTree = "<group>"; };
 		E559409DD9FF9D7AB3FE325F /* PaycheckPlannerWatchApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaycheckPlannerWatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9F98E1E268036F31114E498 /* Shared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -180,6 +182,7 @@
 		AA4E55A826E5809B3B1B0FAC /* PaycheckPlanner */ = {
 			isa = PBXGroup;
 			children = (
+				D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */,
 				D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */,
 				D447D5D02E5B798900710C67 /* AppRouter.swift */,
 				30EF32A82E5A6FD60009E58B /* AppTheme.swift */,
@@ -373,6 +376,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4A4B1592E65ED4100E62BF3 /* DataRepair.swift in Resources */,
 				9B2FC636E07C1016E5184051 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

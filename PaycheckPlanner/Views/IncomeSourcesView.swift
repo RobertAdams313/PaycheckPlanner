@@ -17,111 +17,98 @@
 import SwiftUI
 import SwiftData
 
-/// Income sources grouped (recurring / one-time upcoming / one-time past).
-/// Adds Calendar push toggle & “Push Next N Paydays” to toolbar.
 struct IncomeSourcesView: View {
     @Environment(\.modelContext) private var context
-    @Query(sort: \IncomeSource.name, order: .forward) private var incomes: [IncomeSource]
-    @Query(sort: \IncomeSchedule.anchorDate, order: .forward) private var schedules: [IncomeSchedule]
 
-    @AppStorage("showPastOneTimeIncome") private var showPastOneTimeIncome: Bool = false
-    @AppStorage("pushPaydaysToCalendar") private var pushPaydaysToCalendar: Bool = false
-    @AppStorage("paydayAlertDaysBefore") private var paydayAlertDaysBefore: Int = 1
-    @AppStorage("planPeriodCount") private var planCount: Int = 4
+    @Query(sort: \IncomeSource.name, order: .forward)
+    private var sources: [IncomeSource]
 
-    // MARK: - Buckets
-    private var recurring: [IncomeSource] {
-        incomes.filter { $0.schedule?.frequency != .once }
-    }
-
-    private var upcomingOneTime: [IncomeSource] {
-        let today = Calendar.current.startOfDay(for: Date())
-        return incomes.filter { s in
-            guard s.schedule?.frequency == .once, let d = s.schedule?.anchorDate else { return false }
-            return Calendar.current.startOfDay(for: d) >= today
-        }
-    }
-
-    private var pastOneTime: [IncomeSource] {
-        let today = Calendar.current.startOfDay(for: Date())
-        return incomes.filter { s in
-            guard s.schedule?.frequency == .once, let d = s.schedule?.anchorDate else { return false }
-            return Calendar.current.startOfDay(for: d) < today
-        }
-    }
+    @State private var showNew = false
+    @State private var editing: IncomeSource?
 
     var body: some View {
-        NavigationStack {
-            List {
-                if !recurring.isEmpty {
-                    Section("Recurring") {
-                        ForEach(recurring) { s in sourceRow(s) }
+        List {
+            if sources.isEmpty {
+                Section {
+                    VStack(spacing: 8) {
+                        Text("No income sources yet").font(.headline)
+                        Text("Tap the + button to add your first income.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
                 }
-
-                if !upcomingOneTime.isEmpty {
-                    Section("Upcoming (One-time)") {
-                        ForEach(upcomingOneTime) { s in sourceRow(s) }
+            } else {
+                ForEach(sources) { src in
+                    Button { editing = src } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(src.name).font(.body)
+                                if let sched = src.schedule {
+                                    Text("\(freqDisplayName(sched.frequency)) • \(sched.anchorDate, style: .date)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Text(currencyString(src.defaultAmount))
+                                .monospacedDigit()
+                        }
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
-
-                if showPastOneTimeIncome, !pastOneTime.isEmpty {
-                    Section("Past (One-time)") {
-                        ForEach(pastOneTime) { s in sourceRow(s) }
-                    }
-                }
+                .onDelete(perform: delete)
             }
-            .navigationTitle("Income")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Toggle("Push Paydays to Calendar", isOn: $pushPaydaysToCalendar)
-                        Stepper("Alert \(paydayAlertDaysBefore) day(s) before", value: $paydayAlertDaysBefore, in: 0...14)
-                        Divider()
-                        Button("Push Next \(max(planCount, 1)) Paydays") { pushPaydaysNow() }
-                    } label: {
-                        Image(systemName: "calendar.badge.plus")
-                    }
-                }
+        }
+        .navigationTitle("Income")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showNew = true } label: { Image(systemName: "plus") }
             }
-            .onChange(of: pushPaydaysToCalendar) { newVal in
-                if newVal { pushPaydaysNow() }
+        }
+        // Create
+        .sheet(isPresented: $showNew) {
+            NavigationStack {
+                IncomeEditorView(existing: nil) { _ in }
+                    .navigationTitle("New Income")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        // Edit
+        .sheet(item: $editing) { src in
+            NavigationStack {
+                IncomeEditorView(existing: src) { _ in }
+                    .navigationTitle("Edit Income")
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
     }
 
-    @ViewBuilder
-    private func sourceRow(_ s: IncomeSource) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(s.name.isEmpty ? "Untitled" : s.name)
-                if let sch = s.schedule {
-                    Text("\(sch.frequency.displayName) • \(sch.anchorDate, style: .date)")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Text("No schedule")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            Text(s.defaultAmount.currencyString)
-                .monospacedDigit()
-        }
-        .padding(.vertical, 2)
+    // MARK: - Local helpers (scoped to avoid redeclaration elsewhere)
+
+    private func currencyString(_ d: Decimal) -> String {
+        let n = NSDecimalNumber(decimal: d)
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 2
+        return f.string(from: n) ?? "$0.00"
     }
 
-    // MARK: - Calendar push (paydays)
-    private func pushPaydaysNow() {
-        let periods = CombinedPayEventsEngine.combinedPeriods(schedules: schedules, count: max(planCount, 1))
-        let paydays = periods.map(\.payday)
-        Task {
-            do {
-                for d in paydays {
-                    try await CalendarManager.shared.addPaydayEvent(date: d, alertDaysBefore: paydayAlertDaysBefore)
-                }
-            } catch {
-                print("Push paydays failed: \(error)")
-            }
+    private func freqDisplayName(_ freq: PayFrequency) -> String {
+        switch freq {
+        case .once:        return "Once"
+        case .weekly:      return "Weekly"
+        case .biweekly:    return "Every 2 Weeks"
+        case .semimonthly: return "Twice a Month"
+        case .monthly:     return "Monthly"
         }
+    }
+
+    private func delete(at offsets: IndexSet) {
+        for idx in offsets { context.delete(sources[idx]) }
+        try? context.save()
     }
 }

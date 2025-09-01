@@ -137,6 +137,10 @@ struct PlanView: View {
             }
             .navigationTitle("Plan")
         }
+        // One-time data repair so income sources are linked from schedules.
+        .task {
+            await repairIncomeBacklinks()
+        }
     }
 
     // MARK: - Card row
@@ -292,6 +296,35 @@ struct PlanView: View {
         f.currencyCode = code
         f.maximumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
+    }
+
+    // MARK: - One-time backlink repair (kept local to avoid extra files)
+
+    private func repairIncomeBacklinks() async {
+        do {
+            let srcs = try context.fetch(FetchDescriptor<IncomeSource>())
+            let scheds = try context.fetch(FetchDescriptor<IncomeSchedule>())
+
+            var changed = false
+
+            // Ensure each source's schedule points back to the source
+            for src in srcs {
+                if let sched = src.schedule, sched.source == nil {
+                    sched.source = src
+                    changed = true
+                }
+            }
+
+            // If any schedules are orphaned but clearly linked, you could
+            // add additional heuristics here. For now we rely on src.schedule.
+
+            if changed {
+                try context.save()
+            }
+        } catch {
+            // non-fatal; the view will still render
+            print("Backlink repair failed: \(error)")
+        }
     }
 }
 
