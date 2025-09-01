@@ -11,121 +11,113 @@
 //  BillEditorView.swift
 //  PaycheckPlanner
 //
+//  Created by Rob on 8/24/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
 
 import SwiftUI
 import SwiftData
 
-/// Create or edit a Bill. Uses a real currency field and saves into SwiftData.
 struct BillEditorView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
-    // Existing bill if editing
-    let existingBill: Bill?
+    // SwiftData model
+    @Bindable var bill: Bill
 
-    // Inputs
-    @State private var name: String = ""
-    @State private var amount: Decimal = 0
-    @State private var dueDate: Date = .now
-    @State private var recurrence: BillRecurrence = .monthly
-    @State private var category: String = ""
-
-    // UI
-    @FocusState private var amountFocused: Bool
-    @State private var showSaveError = false
-    var onComplete: (Bool) -> Void = { _ in }
+    // Currency formatting for amount
+    private let amountFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 0
+        return f
+    }()
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Bill") {
-                    TextField("Name", text: $name)
-                        .textInputAutocapitalization(.words)   // <- capitalize words as you type
-                        .disableAutocorrection(true)
-                        .onChange(of: name) { _, newValue in
-                            // Keep it light: let the system handle caps,
-                            // but trim accidental leading spaces.
-                            if newValue.hasPrefix(" ") {
-                                name = String(newValue.drop(while: { $0 == " " }))
-                            }
-                        }
+        Form {
+            // MARK: Details
+            Section("Details") {
+                TextField("Name", text: $bill.name)
+                    .textInputAutocapitalization(.words)
 
-                    CurrencyAmountField(amount: $amount)
-
-                        .focused($amountFocused)
-
-                    DatePicker("First Due Date", selection: $dueDate, displayedComponents: .date)
-
-                    Picker("Repeats", selection: $recurrence) {
-                        ForEach(BillRecurrence.allCasesForBillEditor, id: \.self) { r in
-                            Text(r.uiName).tag(r)
-                        }
-                    }
+                // Amount (Decimal) bound through string formatter bridge
+                HStack {
+                    Text("Amount")
+                    Spacer()
+                    DecimalField(value: $bill.amount, formatter: amountFormatter)
+                        .multilineTextAlignment(.trailing)
+                        .keyboardType(.decimalPad)
+                        .frame(maxWidth: 160)
                 }
+                .accessibilityElement(children: .combine)
 
-                Section("Category (optional)") {
-                    TextField("Category", text: $category)
-                        .textInputAutocapitalization(.words)
-                        .disableAutocorrection(true)
+                // NEW: Category picker (binds to bill.category String)
+                CategoryPicker(category: $bill.category)
+            }
+
+            // MARK: Schedule
+            Section("Schedule") {
+                Picker("Repeats", selection: $bill.recurrence) {
+                    Text("Once").tag(BillRecurrence.once)
+                    Text("Weekly").tag(BillRecurrence.weekly)
+                    Text("Every 2 Weeks").tag(BillRecurrence.biweekly)
+                    Text("Monthly").tag(BillRecurrence.monthly)
+                    Text("Twice a Month").tag(BillRecurrence.semimonthly)
+                }
+                .pickerStyle(.menu)
+
+                // Anchor / due date (first occurrence)
+                DatePicker("Anchor Due Date", selection: $bill.anchorDueDate, displayedComponents: .date)
+            }
+        }
+        .navigationTitle(bill.name.isEmpty ? "New Bill" : bill.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    try? context.save()
+                    dismiss()
+                }
+                .bold()
+            }
+        }
+    }
+}
+
+// MARK: - Decimal text field helper
+
+/// Minimal decimal text field that binds to a Decimal via NumberFormatter.
+/// Avoids accidental locale pitfalls and preserves monospaced digits.
+private struct DecimalField: View {
+    @Binding var value: Decimal
+    let formatter: NumberFormatter
+    @State private var text: String = ""
+
+    init(value: Binding<Decimal>, formatter: NumberFormatter) {
+        self._value = value
+        self.formatter = formatter
+        _text = State(initialValue: formatter.string(from: value.wrappedValue as NSDecimalNumber) ?? "")
+    }
+
+    var body: some View {
+        TextField("0", text: $text)
+            .font(.system(.body, design: .monospaced))
+            .onChange(of: text) { new in
+                // Parse; tolerate empty and partial input
+                let cleaned = new.trimmingCharacters(in: .whitespacesAndNewlines)
+                if cleaned.isEmpty {
+                    value = 0
+                } else if let num = formatter.number(from: cleaned) {
+                    value = num.decimalValue
                 }
             }
-            .navigationTitle(existingBill == nil ? "New Bill" : "Edit Bill")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        onComplete(false)
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(!canSave)
-                }
+            .onAppear {
+                text = formatter.string(from: value as NSDecimalNumber) ?? ""
             }
-            .onAppear(perform: bootstrap)
-            .alert("Couldn’t Save Bill",
-                   isPresented: $showSaveError,
-                   actions: { Button("OK", role: .cancel) {} },
-                   message: { Text("Please try again.") })
-        }
-    }
-
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && amount > 0
-    }
-
-    private func bootstrap() {
-        guard let bill = existingBill else { return }
-        name = bill.name
-        amount = bill.amount
-        dueDate = bill.anchorDueDate
-        recurrence = bill.recurrence
-        category = bill.category
-    }
-
-    private func save() {
-        if let bill = existingBill {
-            bill.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            bill.amount = amount
-            bill.anchorDueDate = dueDate
-            bill.recurrence = recurrence
-            bill.category = category
-        } else {
-            let b = Bill(name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                         amount: amount,
-                         recurrence: recurrence,
-                         anchorDueDate: dueDate,
-                         category: category)
-            context.insert(b)
-        }
-
-        do {
-            try context.save()
-            onComplete(true)
-            dismiss()
-        } catch {
-            showSaveError = true
-            onComplete(false)
-        }
+            .onChange(of: value) { newValue in
+                let s = formatter.string(from: newValue as NSDecimalNumber) ?? ""
+                if s != text { text = s }
+            }
     }
 }

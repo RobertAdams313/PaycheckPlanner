@@ -6,7 +6,6 @@
 //  Copyright © 2025 Rob Adams. All rights reserved.
 //
 
-
 //
 //  SafeAllocationEngine.swift
 //  PaycheckPlanner
@@ -49,8 +48,9 @@ struct CombinedBreakdown: Identifiable, Hashable {
 
 enum SafeAllocationEngine {
 
-    /// Allocate bills into periods and apply carry-forward across them,
-    /// so positive Remaining rolls forward and negative shortfalls carry as debt.
+    /// Allocate bills into periods and apply carry-forward across them.
+    /// IMPORTANT: We treat period bounds as **[start, end)** (start-inclusive, end-exclusive),
+    /// so a bill due **on** the payday/start date is counted in this new period.
     static func allocate(
         bills: [Bill],
         into periods: [CombinedPeriod],
@@ -75,19 +75,24 @@ enum SafeAllocationEngine {
         return results
     }
 
-    // MARK: - Recurrence math
+    // MARK: - Recurrence math (start-inclusive, end-exclusive)
 
     private static func dueOccurrences(of bill: Bill, in start: Date, _ end: Date, cal: Calendar) -> Int {
         guard end > start else { return 0 }
         switch bill.recurrence {
         case .once:
-            return (bill.anchorDueDate > start && bill.anchorDueDate < end) ? 1 : 0
+            // include if due date is in [start, end)
+            return (bill.anchorDueDate >= start && bill.anchorDueDate < end) ? 1 : 0
+
         case .weekly:
             return strideCount(from: bill.anchorDueDate, everyDays: 7, in: start, end, cal: cal)
+
         case .biweekly:
             return strideCount(from: bill.anchorDueDate, everyDays: 14, in: start, end, cal: cal)
+
         case .monthly:
             return monthlyCount(anchor: bill.anchorDueDate, in: start, end, cal: cal)
+
         case .semimonthly:
             let aDay = cal.component(.day, from: bill.anchorDueDate)
             let (d1, d2) = aDay <= 15 ? (max(1, min(28, aDay)), 30) : (1, max(1, min(28, aDay)))
@@ -96,13 +101,15 @@ enum SafeAllocationEngine {
     }
 
     private static func strideCount(from anchor: Date, everyDays: Int, in start: Date, _ end: Date, cal: Calendar) -> Int {
+        // Move forward to the first occurrence **>= start** (not strictly greater).
         var d = anchor
-        while d <= start {
+        while d < start {
             d = cal.date(byAdding: .day, value: everyDays, to: d)
                 ?? d.addingTimeInterval(Double(everyDays) * 86400)
         }
         var n = 0
-        while d < end {                 // <- strictly before end
+        // Count occurrences while d is **< end** (end-exclusive)
+        while d < end {
             n += 1
             d = cal.date(byAdding: .day, value: everyDays, to: d)
                 ?? d.addingTimeInterval(Double(everyDays) * 86400)
@@ -117,7 +124,7 @@ enum SafeAllocationEngine {
         while true {
             guard let y = comps.year, let m = comps.month else { break }
             var c = DateComponents(); c.year = y; c.month = m; c.day = day
-            if let d = cal.date(from: c), d > start && d < end { n += 1 }   // <- < end
+            if let d = cal.date(from: c), d >= start && d < end { n += 1 }   // start-inclusive, end-exclusive
             comps.month = m + 1
             if (cal.date(from: comps) ?? end) >= end { break }
         }
@@ -132,7 +139,7 @@ enum SafeAllocationEngine {
             guard let y = comps.year, let m = comps.month else { break }
             for dd in days {
                 var c = DateComponents(); c.year = y; c.month = m; c.day = dd
-                if let d = cal.date(from: c), d > start && d < end { n += 1 } // <- < end
+                if let d = cal.date(from: c), d >= start && d < end { n += 1 } // start-inclusive, end-exclusive
             }
             comps.month = m + 1
             if (cal.date(from: comps) ?? end) >= end { break }
@@ -140,3 +147,4 @@ enum SafeAllocationEngine {
         return n
     }
 }
+

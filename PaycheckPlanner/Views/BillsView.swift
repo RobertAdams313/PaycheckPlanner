@@ -7,11 +7,18 @@
 //
 
 
+//
+//  BillsView.swift
+//  PaycheckPlanner
+//
+//  Created by Rob on 8/24/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
+
 import SwiftUI
 import SwiftData
 
-/// Bills list + Add (+) button that presents the BillEditor.
-/// Also listens to router.showAddBillSheet, so "Get Started" from Plan can open it.
+/// Bills list + Add (+) button. Adds Calendar push toggle & “Push Now”.
 struct BillsView: View {
     @EnvironmentObject private var router: AppRouter
     @Environment(\.modelContext) private var context
@@ -19,6 +26,10 @@ struct BillsView: View {
     @Query(sort: \Bill.anchorDueDate, order: .forward) private var bills: [Bill]
 
     @State private var editingBill: Bill?
+    @State private var showEditor = false
+
+    @AppStorage("pushBillsToCalendar") private var pushBillsToCalendar: Bool = false
+    @AppStorage("billAlertDaysBefore") private var billAlertDaysBefore: Int = 1
 
     var body: some View {
         NavigationStack {
@@ -48,51 +59,67 @@ struct BillsView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Text(formatCurrency(bill.amount))
-                                    .font(.headline)
+                                Text(bill.amount.currencyString)
+                                    .monospacedDigit()
                             }
+                            .contentShape(Rectangle())
                         }
-                    }
-                    .onDelete { indexSet in
-                        for idx in indexSet {
-                            context.delete(bills[idx])
-                        }
-                        try? context.save()
+                        .buttonStyle(.plain)
                     }
                 }
             }
             .navigationTitle("Bills")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Toggle("Push Bills to Calendar", isOn: $pushBillsToCalendar)
+                        Stepper("Alert \(billAlertDaysBefore) day(s) before", value: $billAlertDaysBefore, in: 0...14)
+                        Divider()
+                        Button("Push Now") { pushBillsNow() }
+                    } label: {
+                        Image(systemName: "calendar.badge.plus")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        router.showAddBillSheet = true
+                        showEditor = true
                     } label: {
                         Image(systemName: "plus")
                     }
                 }
             }
-            // Add new bill sheet
-            .sheet(isPresented: $router.showAddBillSheet) {
-                BillEditorView(existingBill: nil) { created in
-                    // Only close if a bill was actually created
-                    if created { router.showAddBillSheet = false }
-                }
+            // New bill (BillEditorView expects a non-optional Bill and no onComplete:)
+            .sheet(isPresented: $showEditor) {
+                BillEditorView(bill: Bill())
             }
             // Edit existing bill
             .sheet(item: $editingBill) { bill in
-                BillEditorView(existingBill: bill) { _ in
-                    editingBill = nil
-                }
+                BillEditorView(bill: bill)
+            }
+            .onChange(of: pushBillsToCalendar) { newVal in
+                if newVal { pushBillsNow() }
             }
         }
     }
 
-    private func formatCurrency(_ value: Decimal, code: String = "USD") -> String {
-        let n = NSDecimalNumber(decimal: value)
-        let fmt = NumberFormatter()
-        fmt.numberStyle = .currency
-        fmt.currencyCode = code
-        fmt.maximumFractionDigits = 2
-        return fmt.string(from: n) ?? "$0.00"
+    // MARK: - Calendar push
+
+    private func pushBillsNow() {
+        Task {
+            do {
+                for b in bills {
+                    try await CalendarManager.shared.addBillEvent(
+                        name: b.name,
+                        amount: b.amount,
+                        dueDate: b.anchorDueDate,
+                        recurrence: b.recurrence.displayName,
+                        alertDaysBefore: billAlertDaysBefore
+                    )
+                }
+            } catch {
+                // Silently ignore for now; could show a toast/toaster view
+                print("Calendar push failed: \(error)")
+            }
+        }
     }
 }

@@ -7,12 +7,22 @@
 //
 
 
+//
+//  SettingsHostView.swift
+//  PaycheckPlanner
+//
+//  Created by Robert Adams on 8/24/25.
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
+
 import SwiftUI
 import SwiftData
 
 struct SettingsHostView: View {
     @AppStorage("planPeriodCount") private var planCount: Int = 4
-    @AppStorage("themeMode") private var themeMode: Int = 0 // 0 system, 1 light, 2 dark
+
+    // Use the appearance key we’ve been using (string: system/light/dark)
+    @AppStorage("appearance") private var appearance: String = "system"
 
     var body: some View {
         NavigationStack {
@@ -23,17 +33,17 @@ struct SettingsHostView: View {
                         Spacer()
                         Text("\(planCount)").foregroundStyle(.secondary)
                     }
-                    Text("Controls how many upcoming paychecks appear on the Plan tab.")
+                    Text("Controls how many upcoming paychecks appear on the Plan and Insights tabs.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section("Appearance") {
-                    Picker("Theme", selection: $themeMode) {
-                        Text("System").tag(0)
-                        Text("Light").tag(1)
-                        Text("Dark").tag(2)
+                    Picker("Theme", selection: $appearance) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
                     }
                     .pickerStyle(.segmented)
                 }

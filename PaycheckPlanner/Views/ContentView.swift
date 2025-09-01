@@ -9,6 +9,10 @@
 //  ContentView.swift
 //  PaycheckPlanner
 //
+//  Created by Rob on 8/24/25.
+//  Updated on 9/1/25
+//  Copyright © 2025 Rob Adams. All rights reserved.
+//
 
 import SwiftUI
 import SwiftData
@@ -47,10 +51,10 @@ struct ContentView: View {
         // Make router available app-wide
         .environmentObject(router)
 
-        // Present the global "Add Bill" sheet
+        // Global “Add Bill” sheet — BillEditorView(bill:) expects a non-optional Bill
         .sheet(isPresented: $router.showAddBillSheet) {
             NavigationStack {
-                BillEditorView(existingBill: nil) { _ in }
+                BillEditorView(bill: Bill())
                     .navigationTitle("New Bill")
                     .navigationBarTitleDisplayMode(.inline)
             }
@@ -60,3 +64,4 @@ struct ContentView: View {
         .preferredColorScheme(AppAppearance.currentColorScheme)
     }
 }
+
