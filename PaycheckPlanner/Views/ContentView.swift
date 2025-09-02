@@ -3,11 +3,9 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Updated on 9/1/25
+//  Updated on 9/2/25
 //  Copyright © 2025 Rob Adams. All rights reserved.
 //
-
-// Inside ContentView.swift
 
 import SwiftUI
 import SwiftData
@@ -15,6 +13,19 @@ import SwiftData
 struct ContentView: View {
     @StateObject private var router = AppRouter()
     @State private var didApplyDefaultTab = false
+
+    // Read the same key your Settings picker writes: "system" | "light" | "dark"
+    @AppStorage("appearance") private var appearance: String = "system"
+
+    /// Convert stored appearance to an optional ColorScheme.
+    /// Returning nil allows the app to follow the system appearance.
+    private var preferredScheme: ColorScheme? {
+        switch appearance {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil // "system"
+        }
+    }
 
     var body: some View {
         TabView(selection: $router.tab) {
@@ -38,15 +49,18 @@ struct ContentView: View {
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(MainTab.settings)
         }
+        .environmentObject(router)
+        // Apply the appearance override at the top-most level so it affects the entire app.
+        .preferredColorScheme(preferredScheme)
         .onAppear {
             guard !didApplyDefaultTab else { return }
             didApplyDefaultTab = true
             switch AppPreferences.defaultTabRaw {
-            case "bills": router.tab = .bills
-            case "income": router.tab = .income
+            case "bills":    router.tab = .bills
+            case "income":   router.tab = .income
             case "insights": router.tab = .insights
             case "settings": router.tab = .settings
-            default: router.tab = .plan
+            default:         router.tab = .plan
             }
         }
     }

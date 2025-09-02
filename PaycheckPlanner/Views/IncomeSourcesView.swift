@@ -3,143 +3,205 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
-//
-
-//
-//  IncomeSourcesView.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 8/24/25.
-//  Updated on 9/1/25
+//  Updated on 9/2/25 – Card UI parity; explicit NavigationLink(destination:) to avoid value-based routing stalls
 //
 
 import SwiftUI
 import SwiftData
 
+// MARK: - Helpers
+
+private func dateMedium(_ date: Date) -> String {
+    let f = DateFormatter()
+    f.dateStyle = .medium
+    f.timeStyle = .none
+    return f.string(from: date)
+}
+
+private func frequencyLabel(_ freq: PayFrequency) -> String {
+    switch freq {
+    case .once:         return "One-time"
+    case .weekly:       return "Weekly"
+    case .biweekly:     return "Bi-weekly"
+    case .semimonthly:  return "Semi-monthly"
+    case .monthly:      return "Monthly"
+    }
+}
+
+private func currency(_ d: Decimal) -> String {
+    let n = NSDecimalNumber(decimal: d)
+    let f = NumberFormatter()
+    f.numberStyle = .currency
+    f.maximumFractionDigits = 2
+    f.minimumFractionDigits = 2
+    return f.string(from: n) ?? "$0.00"
+}
+
+/// Frosted blur-card (shared)
+private struct FrostCard<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+    }
+}
+
+// MARK: - View
+
 struct IncomeSourcesView: View {
     @Environment(\.modelContext) private var context
 
-    @Query(
-        FetchDescriptor<IncomeSource>(
-            sortBy: [SortDescriptor(\.name, order: .forward)]
-        )
-    )
+    @Query(sort: \IncomeSource.name, order: .forward)
     private var sources: [IncomeSource]
 
-    @State private var showNew: Bool = false
-    @State private var editing: IncomeSource? = nil
-
-    // Drive the edit sheet with a Bool (avoids ambiguous .sheet(item:) overloads)
-    private var isEditingPresented: Binding<Bool> {
-        Binding(get: { editing != nil }, set: { if !$0 { editing = nil } })
-    }
+    @State private var draftNewSource: IncomeSource?
+    @State private var showingAdd = false
 
     var body: some View {
-        List {
-            if sources.isEmpty {
-                ContentUnavailableView(
-                    "No income sources",
-                    systemImage: "banknote",
-                    description: Text("Tap **Add** to create an income source and schedule.")
-                )
-            } else {
-                Section("Sources") {
-                    ForEach(sources) { src in
-                        Button { editing = src } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(src.name.isEmpty ? "Untitled income" : src.name)
-                                        .font(.body)
-                                    Text(scheduleSubtitle(for: src))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(currency(src.defaultAmount))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.primary)
-                            }
-                            .contentShape(Rectangle()) // full-row tap
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Edit income \(src.name)")
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                if let sched = src.schedule { context.delete(sched) }
-                                context.delete(src)
-                                try? context.save()
+        ScrollView {
+            LazyVStack(spacing: 14) {
+                headerBar
+
+                if sources.isEmpty {
+                    emptyState
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(sources) { src in
+                            // Explicit destination avoids type-based routing & potential stalls
+                            NavigationLink {
+                                IncomeEditorView(existing: src)
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                FrostCard { incomeRow(src) }
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 32)
         }
         .navigationTitle("Income")
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showNew = true
+                    addSource()
+                    showingAdd = true
                 } label: {
                     Label("Add Income", systemImage: "plus")
                 }
-                .accessibilityLabel("Add Income")
             }
         }
-        // New income sheet — explicit content: avoids trailing-closure ambiguity
-        .sheet(isPresented: $showNew, content: {
-            IncomeEditorView(existing: nil)
-        })
-        // Edit income sheet — Bool binding + explicit content
-        .sheet(isPresented: isEditingPresented, content: {
-            IncomeEditorView(existing: editing)
-        })
-        // OPTIONAL: background debug probe (safe; remove entirely if not needed)
-        .task {
-            do {
-                try await context.background { bg in
-                    let count = try bg.fetch(FetchDescriptor<IncomeSource>()).count
-                    print("🔎 IncomeSourcesView sees \(count) income sources")
+        // Present editor plainly; avoid `.sheet(item:)` re-identifying the SwiftData object during layout
+        .sheet(isPresented: $showingAdd) {
+            if let newSrc = draftNewSource {
+                NavigationStack {
+                    IncomeEditorView(existing: newSrc)
                 }
-            } catch {
-                print("🔧 IncomeSourcesView probe failed: \(error)")
             }
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Header
 
-    private func scheduleSubtitle(for src: IncomeSource) -> String {
-        guard let s = src.schedule else { return "No schedule" }
-        switch s.frequency {
-        case .weekly:
-            return "Weekly • Start \(formatDate(s.anchorDate))"
-        case .biweekly:
-            return "Biweekly • Start \(formatDate(s.anchorDate))"
-        case .semimonthly:
-            return "Semimonthly • \(s.semimonthlyFirstDay) & \(s.semimonthlySecondDay)"
-        case .monthly:
-            return "Monthly • Start \(formatDate(s.anchorDate))"
-        default:
-            return "Custom schedule • Start \(formatDate(s.anchorDate))"
+    @ViewBuilder
+    private var headerBar: some View {
+        HStack {
+            Text("Your income")
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            Text("\(sources.count)")
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Total income sources")
+        }
+        .padding(.horizontal, 2)
+    }
+
+    // MARK: - Row
+
+    @ViewBuilder
+    private func incomeRow(_ src: IncomeSource) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(src.name.isEmpty ? "Untitled Income" : src.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                if let sched = src.schedule {
+                    HStack(spacing: 8) {
+                        Text(frequencyLabel(sched.frequency))
+                        Text("Starts \(dateMedium(sched.anchorDate))")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            if src.defaultAmount > 0 {
+                Text(currency(src.defaultAmount))
+                    .font(.body.monospacedDigit())
+                    .foregroundStyle(.primary)
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
         }
     }
 
-    private func currency(_ d: Decimal) -> String {
-        let n = NSDecimalNumber(decimal: d)
-        let f = NumberFormatter()
-        f.numberStyle = .currency
-        f.maximumFractionDigits = 2
-        f.minimumFractionDigits = 2
-        return f.string(from: n) ?? "$0.00"
+    // MARK: - Empty State
+
+    @ViewBuilder
+    private var emptyState: some View {
+        FrostCard {
+            VStack(spacing: 8) {
+                Image(systemName: "tray")
+                    .imageScale(.large)
+                Text("No income sources yet")
+                    .font(.headline)
+                Text("Tap + to add your first income source.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+        }
+        .padding(.top, 8)
     }
 
-    private func formatDate(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .none
-        return f.string(from: d)
+    // MARK: - Actions
+
+    private func addSource() {
+        // Stage in context (so the editor can bind) but present via Bool-based sheet to minimize identity churn.
+        let sched = IncomeSchedule(frequency: .biweekly, anchorDate: Date())
+        let new = IncomeSource(name: "", defaultAmount: 0, variable: false, schedule: sched)
+        context.insert(new)
+        draftNewSource = new
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    NavigationStack {
+        IncomeSourcesView()
+            .modelContainer(for: [IncomeSource.self, IncomeSchedule.self], inMemory: true)
     }
 }
