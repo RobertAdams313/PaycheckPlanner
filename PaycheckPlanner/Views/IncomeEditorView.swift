@@ -74,7 +74,7 @@ struct IncomeEditorView: View {
                         Text("Monthly").tag(PayFrequency.monthly)
                     }
 
-                    DatePicker("Anchor date", selection: $anchorDate, displayedComponents: .date)
+                    DatePicker("Start Date", selection: $anchorDate, displayedComponents: .date)
                         .help("The reference date used to compute future paydays.")
 
                     if frequency == .semimonthly {

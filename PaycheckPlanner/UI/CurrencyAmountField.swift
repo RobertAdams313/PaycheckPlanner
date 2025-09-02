@@ -87,7 +87,7 @@ struct CurrencyAmountField: View {
     private func parseDecimal(from input: String) -> Decimal? {
         // Accept both localized and "plain" input; strip currency symbols and grouping
         let decSep = locale.decimalSeparator ?? "."
-        var allowed = "0123456789\(decSep)"
+        _ = "0123456789\(decSep)"
         // Remove currency symbols & spaces
         var cleaned = input
             .replacingOccurrences(of: " ", with: "")

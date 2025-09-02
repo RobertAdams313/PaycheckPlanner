@@ -3,15 +3,7 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
-//
-
-//
-//  PlanView.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 8/24/25.
-//  Updated on 9/1/25
+//  Updated on 9/2/25
 //
 
 import SwiftUI
@@ -32,8 +24,7 @@ struct PlanView: View {
 
     // MARK: - Period sources
 
-    /// Current + future periods (current is first). The new engine guarantees the first
-    /// period spans “today” when there’s a single recurring schedule (weekly/biweekly/monthly/semimonthly).
+    /// Current + future periods (current is first).
     private var upcomingBreakdowns: [CombinedBreakdown] {
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
@@ -76,8 +67,8 @@ struct PlanView: View {
                                 }
                                 .listRowInsets(EdgeInsets())
                                 .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                             } header: {
-                                // HIG polish: date range first, “Current Pay Period” under it
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(formatDateRange(start: current.period.start, end: current.period.end))
                                         .font(.headline)
@@ -100,6 +91,7 @@ struct PlanView: View {
                                     }
                                     .listRowInsets(EdgeInsets())
                                     .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
                                 }
                             }
                         }
@@ -107,49 +99,76 @@ struct PlanView: View {
                         // Link to history only if we have previous periods
                         if previousCount > 0 {
                             Section {
+                                // Card-like NavigationLink matching other cards, badge stays to right
                                 NavigationLink {
                                     PreviousPeriodsView()
                                 } label: {
-                                    HStack(spacing: 8) {
-                                        Text("See Previous Pay Periods")
+                                    VStack(spacing: 0) {
+                                        HStack(spacing: 8) {
+                                            Spacer(minLength: 0)
 
-                                        // Badge capsule with capped count (Apple-like)
-                                        Text(previousCountDisplay)
-                                            .font(.caption2.weight(.semibold))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(
-                                                Capsule(style: .continuous)
-                                                    .fill(.thinMaterial)
-                                            )
-                                            .overlay(
-                                                Capsule(style: .continuous)
-                                                    .strokeBorder(.quaternary, lineWidth: 0.5)
-                                            )
-                                            .accessibilityHidden(true)
+                                            Text("Show Previous Pay Periods")
+                                                .font(.headline)
+                                                .fontWeight(.semibold)
+                                                .multilineTextAlignment(.center)
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
 
-                                        Spacer()
+                                            Text(previousCountDisplay)
+                                                .font(.caption2.weight(.semibold))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(
+                                                    Capsule(style: .continuous)
+                                                        .fill(.thinMaterial)
+                                                )
+                                                .overlay(
+                                                    Capsule(style: .continuous)
+                                                        .strokeBorder(.quaternary, lineWidth: 0.5)
+                                                )
+                                                .accessibilityHidden(true)
 
-                                        Image(systemName: "chevron.right")
-                                            .font(.footnote.weight(.semibold))
-                                            .foregroundStyle(.tertiary)
+                                            Spacer(minLength: 0)
+                                        }
+                                        .frame(minHeight: 56) // HIG tap target with room for badge
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 8)
                                     }
+                                    .frame(maxWidth: .infinity)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                            .fill(.ultraThinMaterial)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                                    .strokeBorder(.separator.opacity(0.15))
+                                            )
+                                            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+                                    )
+                                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                                    .padding(.horizontal)
                                     .padding(.vertical, 6)
-                                    .accessibilityLabel("See Previous Pay Periods, \(previousCountDisplay)")
                                 }
+                                .buttonStyle(PressCardStyle()) // 🔹 pressed effect wired in
+                                .accessibilityLabel("Show Previous Pay Periods, \(previousCountDisplay)")
+                                .listRowInsets(EdgeInsets())
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                             }
                         }
                     }
-                    .listStyle(.insetGrouped)
+                    // Remove all separators and background; provide subtle background
+                    .listStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .listSectionSeparator(.hidden, edges: .all)
+                    .scrollContentBackground(.hidden)
+                    .background(Color(.systemGroupedBackground))
                 }
             }
             .navigationTitle("Plan")
         }
         // One-time data repair so income sources are linked from schedules.
-        .task {
-            await repairIncomeBacklinks()
-        }
-        // 🔍 DEBUG PROBE (background): print schedules and computed periods/incomes to Xcode console
+        .task { await repairIncomeBacklinks() }
+        // 🔍 DEBUG PROBE (background)
         .task {
             do {
                 try await context.background { bg in
@@ -163,7 +182,6 @@ struct PlanView: View {
                         let srcName = (s.source?.name.isEmpty == false) ? s.source!.name : "Unnamed"
                         print(" – \(srcName) | \(s.frequency) @ \(f.string(from: s.anchorDate)) | semi \(s.semimonthlyFirstDay)/\(s.semimonthlySecondDay)")
 
-                        // Single-schedule probe
                         let probe = CombinedPayEventsEngine.combinedPeriods(
                             schedules: [s],
                             count: 2,
@@ -191,7 +209,6 @@ struct PlanView: View {
                     }
                 }
             } catch {
-                // Don’t crash the UI; just log the probe error.
                 print("🔧 PlanView probe failed: \(error)")
             }
         }
@@ -206,7 +223,7 @@ struct PlanView: View {
         let billsSum  = b.billsTotal
         let remaining = startBal - billsSum
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(formatDateRange(start: b.period.start, end: b.period.end))
@@ -230,8 +247,12 @@ struct PlanView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.background.opacity(0.8))
-                .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.separator.opacity(0.15))
+                )
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         )
         .padding(.horizontal)
         .padding(.vertical, 6)
@@ -257,31 +278,38 @@ struct PlanView: View {
         .overlay(Capsule().strokeBorder(.quaternary, lineWidth: 0.5))
     }
 
-    // MARK: - Running balance bar
+    // MARK: - Running balance bar (HIG-compliant + single-line title/percent)
 
     private func miniRunningBalance(startBalance: Decimal, bills: Decimal, endBalance: Decimal) -> some View {
         let start = max(0, (startBalance as NSDecimalNumber).doubleValue)
         let spend = max(0, (bills as NSDecimalNumber).doubleValue)
-        let total = max(start, 0.0001)
-        let billsFrac = min(max(spend / total, 0), 1)
+        let fraction = min(max(spend / max(start, 0.0001), 0), 1) // 0...1
+        let percent = Int((fraction * 100).rounded())
 
-        return VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .frame(height: 6)
-                        .foregroundStyle(Color.primary.opacity(0.9))   // “Remaining” rail
-                    RoundedRectangle(cornerRadius: 3)
-                        .frame(width: geo.size.width * CGFloat(billsFrac), height: 6)
-                        .foregroundStyle(.tint)                        // Bills filling up
-                }
+        return VStack(alignment: .leading, spacing: 8) {
+            // Single-line title + percent (HIG-friendly)
+            HStack {
+                Text("Bills this period")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+                Text("\(percent)%")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
-            .frame(height: 6)
+            .font(.footnote)
 
+            ProgressView(value: fraction)
+                .progressViewStyle(.linear)
+                .tint(Color.accentColor)
+                .accessibilityLabel("Bills this period")
+                .accessibilityValue("\(percent) percent of income allocated to bills")
+
+            // Context labels under the bar
             HStack(spacing: 6) {
                 Text(formatCurrency(startBalance))
                 Spacer(minLength: 0)
-                Text("→")
+                Text("→").accessibilityHidden(true)
                 Spacer(minLength: 0)
                 Text(formatCurrency(endBalance))
             }
@@ -318,10 +346,7 @@ struct PlanView: View {
 
     // MARK: - Utilities
 
-    /// Formats a period date range concisely:
-    /// - Same month/year:   "Sep 1–15, 2025"
-    /// - Same year:         "Sep 29–Oct 13, 2025"
-    /// - Different years:   "Dec 30, 2025–Jan 12, 2026"
+    /// Formats a period date range concisely.
     private func formatDateRange(start: Date, end: Date) -> String {
         let cal = Calendar.current
         let sComp = cal.dateComponents([.year, .month, .day], from: start)
@@ -352,7 +377,7 @@ struct PlanView: View {
         return f.string(from: n) ?? "$0.00"
     }
 
-    // MARK: - One-time backlink repair (kept local to avoid extra files)
+    // MARK: - One-time backlink repair
 
     private func repairIncomeBacklinks() async {
         do {
@@ -372,6 +397,44 @@ struct PlanView: View {
             // non-fatal
             print("Backlink repair failed: \(error)")
         }
+    }
+}
+
+// MARK: - Shared card container (if you want to reuse on other controls)
+
+private struct CardContainer<Content: View>: View {
+    let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.separator.opacity(0.15))
+            )
+            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+            .overlay(
+                VStack(spacing: 12) {
+                    content
+                }
+                .padding(14)
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Pressed effect for card-like controls (HIG-friendly)
+
+private struct PressCardStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .sensoryFeedback(.selection, trigger: configuration.isPressed) // subtle haptic on touch down (where supported)
     }
 }
 

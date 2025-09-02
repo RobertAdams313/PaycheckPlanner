@@ -24,7 +24,7 @@ extension ModelContext {
     /// - Note: `ModelContext.container` is a *throwing* getter, so this API is `throws`.
     ///         Call as: `try await context.background { bg in ... }`
     func background<T>(_ work: @escaping (ModelContext) throws -> T) async throws -> T {
-        let container = try self.container
+        let container = self.container
         return try await Task.detached(priority: .utility) {
             let bg = ModelContext(container)
             bg.autosaveEnabled = false
@@ -35,7 +35,7 @@ extension ModelContext {
     /// Convenience overload for non-throwing work closures.
     /// Lets you avoid `try` if your work doesn’t throw (you still need `try` for the container).
     func background<T>(_ work: @escaping (ModelContext) -> T) async throws -> T {
-        let container = try self.container
+        let container = self.container
         return await Task.detached(priority: .utility) {
             let bg = ModelContext(container)
             bg.autosaveEnabled = false

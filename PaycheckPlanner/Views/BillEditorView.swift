@@ -118,7 +118,7 @@ struct BillEditorView: View {
         switch r {
         case .once: "One-time"
         case .weekly: "Weekly"
-        case .biweekly: "Every 2 Weeks"
+        case .biweekly: "Biweekly"
         case .semimonthly: "Twice a Month"
         case .monthly: "Monthly"
         }

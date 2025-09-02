@@ -115,15 +115,15 @@ struct IncomeSourcesView: View {
         guard let s = src.schedule else { return "No schedule" }
         switch s.frequency {
         case .weekly:
-            return "Weekly • anchor \(formatDate(s.anchorDate))"
+            return "Weekly • Start \(formatDate(s.anchorDate))"
         case .biweekly:
-            return "Biweekly • anchor \(formatDate(s.anchorDate))"
+            return "Biweekly • Start \(formatDate(s.anchorDate))"
         case .semimonthly:
             return "Semimonthly • \(s.semimonthlyFirstDay) & \(s.semimonthlySecondDay)"
         case .monthly:
-            return "Monthly • anchor \(formatDate(s.anchorDate))"
+            return "Monthly • Start \(formatDate(s.anchorDate))"
         default:
-            return "Custom schedule • anchor \(formatDate(s.anchorDate))"
+            return "Custom schedule • Start \(formatDate(s.anchorDate))"
         }
     }
 
