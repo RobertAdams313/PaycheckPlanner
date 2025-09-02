@@ -6,7 +6,6 @@
 //  Copyright © 2025 Rob Adams. All rights reserved.
 //
 
-
 import Foundation
 import SwiftData
 
@@ -17,12 +16,10 @@ enum PayFrequency: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-
 enum BillRecurrence: String, Codable, CaseIterable, Identifiable {
     case once, weekly, biweekly, semimonthly, monthly
     var id: String { rawValue }
 }
-
 
 // MARK: - SwiftData Models
 // No @Relationship attributes (let SwiftData infer).
@@ -74,7 +71,6 @@ final class IncomeSchedule {
     }
 }
 
-
 @Model
 final class IncomeSource {
     var name: String = ""
@@ -98,8 +94,6 @@ final class IncomeSource {
     }
 }
 
-
-
 @Model
 final class Bill {
     var name: String = ""
@@ -107,20 +101,30 @@ final class Bill {
     var recurrence: BillRecurrence = BillRecurrence.monthly
     var anchorDueDate: Date = Foundation.Date()
 
-    // NEW: optional category for insights pie chart (e.g., "Rent", "Utilities")
+    // Optional category for insights pie chart (e.g., "Rent", "Utilities")
     var category: String = ""
+
+    // NEW: Optional recurrence end date. If set, no due dates on/after the day after this date.
+    var endDate: Date? = nil
+
+    // Optional activation flag (kept for future UX toggles; defaults to true).
+    var active: Bool = true
 
     init(
         name: String = "",
         amount: Decimal = Foundation.Decimal(0),
         recurrence: BillRecurrence = BillRecurrence.monthly,
         anchorDueDate: Date = Foundation.Date(),
-        category: String = ""
+        category: String = "",
+        endDate: Date? = nil,
+        active: Bool = true
     ) {
         self.name = name
         self.amount = amount
         self.recurrence = recurrence
         self.anchorDueDate = anchorDueDate
         self.category = category
+        self.endDate = endDate
+        self.active = active
     }
 }

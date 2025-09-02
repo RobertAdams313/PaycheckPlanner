@@ -65,6 +65,11 @@
 		D4C92E632E66D010000AC97A /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E622E66D010000AC97A /* Haptics.swift */; };
 		D4C92E652E66D01E000AC97A /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E642E66D01E000AC97A /* NotificationScheduler.swift */; };
 		D4C92E672E66D02E000AC97A /* CSVImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E662E66D02E000AC97A /* CSVImporter.swift */; };
+		D4C92E752E676E65000AC97A /* MoneyRounding.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E692E676011000AC97A /* MoneyRounding.swift */; };
+		D4C92E762E67784B000AC97A /* NotificationsCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E6E2E676C8B000AC97A /* NotificationsCoordinator.swift */; };
+		D4C92E772E677857000AC97A /* NotificationsBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E702E676CB7000AC97A /* NotificationsBootstrap.swift */; };
+		D4C92E782E67785D000AC97A /* NotificationDeepLinkModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E6F2E676C96000AC97A /* NotificationDeepLinkModel.swift */; };
+		D4C92E792E677868000AC97A /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E6D2E676C66000AC97A /* NotificationManager.swift */; };
 		E17EDB1ABD45DE5F92DF9CF0 /* SharedAppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */; };
 		E8CCBA6F5C9DF1360F3541DD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5E4D6F5F9586F1EC432208AA /* README.md */; };
 /* End PBXBuildFile section */
@@ -136,6 +141,11 @@
 		D4C92E622E66D010000AC97A /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
 		D4C92E642E66D01E000AC97A /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		D4C92E662E66D02E000AC97A /* CSVImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVImporter.swift; sourceTree = "<group>"; };
+		D4C92E692E676011000AC97A /* MoneyRounding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoneyRounding.swift; sourceTree = "<group>"; };
+		D4C92E6D2E676C66000AC97A /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		D4C92E6E2E676C8B000AC97A /* NotificationsCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsCoordinator.swift; sourceTree = "<group>"; };
+		D4C92E6F2E676C96000AC97A /* NotificationDeepLinkModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationDeepLinkModel.swift; sourceTree = "<group>"; };
+		D4C92E702E676CB7000AC97A /* NotificationsBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsBootstrap.swift; sourceTree = "<group>"; };
 		E559409DD9FF9D7AB3FE325F /* PaycheckPlannerWatchApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaycheckPlannerWatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9F98E1E268036F31114E498 /* Shared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -202,6 +212,7 @@
 		AA4E55A826E5809B3B1B0FAC /* PaycheckPlanner */ = {
 			isa = PBXGroup;
 			children = (
+				D4C92E692E676011000AC97A /* MoneyRounding.swift */,
 				D447D5D02E5B798900710C67 /* AppRouter.swift */,
 				30EF32A82E5A6FD60009E58B /* AppTheme.swift */,
 				552A59BD28DDD45723568119 /* Assets.xcassets */,
@@ -266,6 +277,24 @@
 			path = Settings;
 			sourceTree = "<group>";
 		};
+		D4C92E6B2E676C28000AC97A /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				D4C92E702E676CB7000AC97A /* NotificationsBootstrap.swift */,
+				D4C92E6F2E676C96000AC97A /* NotificationDeepLinkModel.swift */,
+				D4C92E6E2E676C8B000AC97A /* NotificationsCoordinator.swift */,
+				D4C92E6D2E676C66000AC97A /* NotificationManager.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		D4C92E6C2E676C33000AC97A /* MarkasPaid */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = MarkasPaid;
+			sourceTree = "<group>";
+		};
 		D8DEB7A5B4B2722C93D8EA84 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -295,6 +324,8 @@
 		EB99A7E989B136BFE70B6384 = {
 			isa = PBXGroup;
 			children = (
+				D4C92E6C2E676C33000AC97A /* MarkasPaid */,
+				D4C92E6B2E676C28000AC97A /* Notifications */,
 				AA4E55A826E5809B3B1B0FAC /* PaycheckPlanner */,
 				12D98C762B5DDE046A8D3608 /* PaycheckPlannerWatchApp */,
 				3418DB1CD1CF037398488FCE /* PaycheckPlannerWatchExtension */,
@@ -453,11 +484,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4C92E752E676E65000AC97A /* MoneyRounding.swift in Sources */,
 				D4C92E492E6661F4000AC97A /* ModelContext.swift in Sources */,
 				D4C92E4A2E6661F4000AC97A /* DataRepair.swift in Sources */,
 				301B2FEC2E6359CB001D09D0 /* CompatTypes.swift in Sources */,
 				301B2FEB2E635993001D09D0 /* UIStrings.swift in Sources */,
 				D4A4B1532E65C29900E62BF3 /* PreviousPeriodsView.swift in Sources */,
+				D4C92E782E67785D000AC97A /* NotificationDeepLinkModel.swift in Sources */,
 				D447D5D12E5B798900710C67 /* AppRouter.swift in Sources */,
 				D447D59E2E5B600400710C67 /* BillEditorView.swift in Sources */,
 				D4A4B1552E65C95F00E62BF3 /* DateSpan.swift in Sources */,
@@ -470,6 +503,8 @@
 				30EF32F62E5B3EFF0009E58B /* LiquidGlassToggleModifier.swift in Sources */,
 				30A4BAF42E63727800492CB9 /* CurrencyAmountField.swift in Sources */,
 				D4C92E402E665C64000AC97A /* MigrationSheet.swift in Sources */,
+				D4C92E772E677857000AC97A /* NotificationsBootstrap.swift in Sources */,
+				D4C92E792E677868000AC97A /* NotificationManager.swift in Sources */,
 				D4C92E482E6661A1000AC97A /* StoreHub.swift in Sources */,
 				D4C92E672E66D02E000AC97A /* CSVImporter.swift in Sources */,
 				D447D5A22E5B603100710C67 /* IncomeSourcesView.swift in Sources */,
@@ -491,6 +526,7 @@
 				30EF32F82E5B3F360009E58B /* SplashOverlay.swift in Sources */,
 				D4C92E4C2E6671A6000AC97A /* NameAutoCapModifier.swift in Sources */,
 				D447D5C52E5B726300710C67 /* SafeAllocationEngine.swift in Sources */,
+				D4C92E762E67784B000AC97A /* NotificationsCoordinator.swift in Sources */,
 				D447D5C32E5B724900710C67 /* Models_SwiftData.swift in Sources */,
 				D447D5CD2E5B76E800710C67 /* AddOrEditBillView.swift in Sources */,
 				D447D5D32E5B79A400710C67 /* ContentView.swift in Sources */,

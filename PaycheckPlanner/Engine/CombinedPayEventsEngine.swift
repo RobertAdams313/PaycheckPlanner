@@ -6,7 +6,6 @@
 //  Copyright © 2025 Rob Adams. All rights reserved.
 //
 
-
 //
 //  CombinedPayEventsEngine.swift
 //  PaycheckPlanner
@@ -417,5 +416,43 @@ enum CombinedPayEventsEngine {
 
     private static func stripTime(_ d: Date, cal: Calendar) -> Date {
         cal.startOfDay(for: d)
+    }
+}
+
+// MARK: - Notifications-friendly helpers
+
+extension CombinedPayEventsEngine {
+    /// Build **upcoming** breakdowns (periods + bills allocated) for notifications/badges.
+    /// Start from `from` (default now), return `count` periods forward.
+    @MainActor
+    static func upcomingBreakdowns(
+        context: ModelContext,
+        count: Int,
+        from: Date = .now,
+        calendar: Calendar = .current
+    ) -> [CombinedBreakdown] {
+        // Fetch inputs
+        let schedules: [IncomeSchedule] = (try? context.fetch(FetchDescriptor<IncomeSchedule>())) ?? []
+        let bills: [Bill] = (try? context.fetch(FetchDescriptor<Bill>())) ?? []
+
+        // Build periods then allocate bills
+        let periods = CombinedPayEventsEngine.combinedPeriods(
+            schedules: schedules,
+            count: max(1, count),
+            from: from,
+            using: calendar
+        )
+        return SafeAllocationEngine.allocate(bills: bills, into: periods, calendar: calendar)
+    }
+
+    /// Alias to match older call sites used in NotifyKeys.swift.
+    @MainActor
+    static func combinedBreakdownsForUpcoming(
+        context: ModelContext,
+        count: Int,
+        from: Date = .now,
+        calendar: Calendar = .current
+    ) -> [CombinedBreakdown] {
+        upcomingBreakdowns(context: context, count: count, from: from, calendar: calendar)
     }
 }

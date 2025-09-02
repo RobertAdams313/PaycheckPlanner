@@ -2,91 +2,121 @@
 //  PreviousPeriodsView.swift
 //  PaycheckPlanner
 //
-//  Created by Rob on 9/1/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
-//
-
-
-//
-//  PreviousPeriodsView.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
+//  Created by Rob on 9/2/25.
 //
 
 import SwiftUI
 import SwiftData
 
 struct PreviousPeriodsView: View {
+    @Environment(\.modelContext) private var context
+
     @Query(sort: \IncomeSchedule.anchorDate, order: .forward)
     private var schedules: [IncomeSchedule]
 
     @Query(sort: \Bill.anchorDueDate, order: .forward)
     private var bills: [Bill]
 
-    // MARK: - Data
+    // Page size for incremental loading
+    @State private var showCount: Int = 12
 
-    /// Previous periods = those that ended strictly before today; newest first.
-    private var previousBreakdowns: [CombinedBreakdown] {
-        let pastStart = Calendar.current.date(byAdding: .day, value: -180, to: Date())
-            ?? Date().addingTimeInterval(-180 * 86400)
+    private var previousBreakdownsAll: [CombinedBreakdown] {
+        // Generate a wide range in the past, then filter to periods that ended before today
+        let today = Calendar.current.startOfDay(for: Date.now)
+        let pastStart = Calendar.current.date(byAdding: .day, value: -365, to: today) ?? today
+
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
-            count: 60,
+            count: 180,           // large grid to cover past year across frequencies
             from: pastStart
         )
         let allocated = SafeAllocationEngine.allocate(bills: bills, into: periods)
-        let today = Calendar.current.startOfDay(for: Date())
+
+        // Only those that ended strictly before today; most recent first
         return allocated
             .filter { $0.period.end <= today }
             .sorted { $0.period.end > $1.period.end }
     }
 
-    private var previousCount: Int { previousBreakdowns.count }
-    private var previousCountDisplay: String {
-        previousCount > 99 ? "99+" : "\(previousCount)"
+    private var previousBreakdownsPaged: [CombinedBreakdown] {
+        Array(previousBreakdownsAll.prefix(showCount))
     }
-
-    // MARK: - Body
 
     var body: some View {
-        List {
-            if previousBreakdowns.isEmpty {
-                ContentUnavailableView(
-                    "No previous periods yet",
-                    systemImage: "clock.arrow.circlepath",
-                    description: Text("Once a pay period ends, it will appear here.")
-                )
+        Group {
+            if schedules.isEmpty {
+                emptyState
+            } else if previousBreakdownsAll.isEmpty {
+                noHistoryState
             } else {
-                ForEach(previousBreakdowns) { b in
-                    NavigationLink {
-                        PaycheckDetailView(breakdown: b)
-                    } label: {
-                        periodCard(b)
+                ScrollView {
+                    VStack(spacing: 16) {
+
+                        // Header
+                        header
+
+                        // Cards
+                        ForEach(previousBreakdownsPaged) { b in
+                            NavigationLink {
+                                PaycheckDetailView(breakdown: b)
+                            } label: {
+                                periodCard(b)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        // Load More
+                        if showCount < previousBreakdownsAll.count {
+                            Button {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    showCount = min(previousBreakdownsAll.count, showCount + 12)
+                                }
+                            } label: {
+                                loadMoreCard(remaining: previousBreakdownsAll.count - showCount)
+                            }
+                            .buttonStyle(PressCardStyle())
+                            .padding(.top, 4)
+                        }
                     }
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
+                    .frame(maxWidth: 700) // match PlanView column, adjust to taste
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .background(Color(.systemGroupedBackground))
             }
         }
-        .listStyle(.insetGrouped)
-        .navigationTitle(
-            previousCount > 0
-            ? "Previous Periods (\(previousCountDisplay))"
-            : "Previous Periods"
-        )
+        .navigationTitle("Previous Periods")
     }
 
-    // MARK: - Row
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(spacing: 2) {
+            Text("History")
+                .font(.headline)
+            if let firstEnd = previousBreakdownsPaged.first?.period.end,
+               let lastEnd  = previousBreakdownsPaged.last?.period.end {
+                Text("\(formatMonthYear(lastEnd)) – \(formatMonthYear(firstEnd))")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
+        .accessibilityElement(children: .combine)
+    }
+
+    // MARK: - Cards
 
     private func periodCard(_ b: CombinedBreakdown) -> some View {
+        let carryIn   = b.carryIn
         let income    = b.incomeTotal
-        let startBal  = income + b.carryIn
+        let startBal  = income + carryIn
         let billsSum  = b.billsTotal
         let remaining = startBal - billsSum
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(formatDateRange(start: b.period.start, end: b.period.end))
@@ -101,43 +131,117 @@ struct PreviousPeriodsView: View {
                     .monospacedDigit()
             }
 
+            if carryIn != 0 {
+                carryInBadge(carryIn)
+            }
+
             miniRunningBalance(startBalance: startBal, bills: billsSum, endBalance: remaining)
         }
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.background.opacity(0.8))
-                .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.separator.opacity(0.15))
+                )
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         )
+        .frame(maxWidth: .infinity)
         .padding(.horizontal)
         .padding(.vertical, 6)
     }
 
-    // MARK: - Helpers (match PlanView style)
+    private func loadMoreCard(remaining: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                Text("Load More")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                Text("\(remaining)")
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(.thinMaterial)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(.quaternary, lineWidth: 0.5)
+                    )
+                    .accessibilityHidden(true)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 56)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.separator.opacity(0.15))
+                )
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Badges / Bars
+
+    @ViewBuilder
+    private func carryInBadge(_ amount: Decimal) -> some View {
+        let positive = amount >= 0
+        let label = positive ? "Carry-in" : "Carry-over"
+        let display = positive ? "+\(formatCurrency(amount))" : formatCurrency(amount)
+
+        HStack(spacing: 6) {
+            Image(systemName: positive ? "arrow.down.right.circle.fill" : "arrow.up.right.circle.fill")
+                .imageScale(.small)
+            Text("\(label) \(display)")
+                .font(.caption2.weight(.semibold))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.thinMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.quaternary, lineWidth: 0.5))
+    }
 
     private func miniRunningBalance(startBalance: Decimal, bills: Decimal, endBalance: Decimal) -> some View {
         let start = max(0, (startBalance as NSDecimalNumber).doubleValue)
         let spend = max(0, (bills as NSDecimalNumber).doubleValue)
-        let total = max(start, 0.0001)
-        let billsFrac = min(max(spend / total, 0), 1)
+        let fraction = min(max(spend / max(start, 0.0001), 0), 1) // 0...1
+        let percent = Int((fraction * 100).rounded())
 
-        return VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .frame(height: 6)
-                        .foregroundStyle(Color.primary.opacity(0.9))
-                    RoundedRectangle(cornerRadius: 3)
-                        .frame(width: geo.size.width * CGFloat(billsFrac), height: 6)
-                        .foregroundStyle(.tint)
-                }
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Bills this period")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+                Text("\(percent)%")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
             }
-            .frame(height: 6)
+            .font(.footnote)
+
+            ProgressView(value: fraction)
+                .progressViewStyle(.linear)
+                .tint(Color.accentColor)
+                .accessibilityLabel("Bills this period")
+                .accessibilityValue("\(percent) percent of income allocated to bills")
 
             HStack(spacing: 6) {
                 Text(formatCurrency(startBalance))
                 Spacer(minLength: 0)
-                Text("→")
+                Text("→").accessibilityHidden(true)
                 Spacer(minLength: 0)
                 Text(formatCurrency(endBalance))
             }
@@ -147,16 +251,59 @@ struct PreviousPeriodsView: View {
         .padding(.top, 2)
     }
 
-    /// Formats:
-    /// - Same month/year:   "Sep 1–15, 2025"
-    /// - Same year:         "Sep 29–Oct 13, 2025"
-    /// - Different years:   "Dec 30, 2025–Jan 12, 2026"
+    // MARK: - Empty states
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 56, weight: .semibold))
+                .foregroundStyle(.tint)
+            Text("No schedules yet")
+                .font(.title3).bold()
+            Text("Add at least one income schedule and bill to build your pay period history.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    private var noHistoryState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 56, weight: .semibold))
+                .foregroundStyle(.tint)
+            Text("No previous periods yet")
+                .font(.title3).bold()
+            Text("Once a pay period completes, you’ll see the history here.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemGroupedBackground))
+    }
+
+    // MARK: - Formatting
+
+    private func formatMonthYear(_ d: Date) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "MMM yyyy"
+        return df.string(from: d)
+    }
+
     private func formatDateRange(start: Date, end: Date) -> String {
         let cal = Calendar.current
         let sComp = cal.dateComponents([.year, .month, .day], from: start)
         let eComp = cal.dateComponents([.year, .month, .day], from: end)
 
         let dfDay = DateFormatter(); dfDay.dateFormat = "d"
+        let dfMonth = DateFormatter.cached("MMM")
         let dfMonthDay = DateFormatter(); dfMonthDay.dateFormat = "MMM d"
         let dfMonthDayYear = DateFormatter(); dfMonthDayYear.dateFormat = "MMM d, yyyy"
 
@@ -164,8 +311,7 @@ struct PreviousPeriodsView: View {
             return "\(dfMonthDayYear.string(from: start))–\(dfMonthDayYear.string(from: end))"
         }
         if sComp.month == eComp.month {
-            let month = DateFormatter.cached("MMM").string(from: start)
-            return "\(month) \(dfDay.string(from: start))–\(dfDay.string(from: end)), \(sComp.year!)"
+            return "\(dfMonth.string(from: start)) \(dfDay.string(from: start))–\(dfDay.string(from: end)), \(sComp.year!)"
         } else {
             return "\(dfMonthDay.string(from: start))–\(dfMonthDay.string(from: end)), \(sComp.year!)"
         }
@@ -177,7 +323,20 @@ struct PreviousPeriodsView: View {
         f.numberStyle = .currency
         f.currencyCode = code
         f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
+    }
+}
+
+// MARK: - Pressed effect (same as PlanView)
+
+private struct PressCardStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .opacity(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+            .sensoryFeedback(.selection, trigger: configuration.isPressed)
     }
 }
 

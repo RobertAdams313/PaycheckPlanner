@@ -199,22 +199,12 @@ struct SettingsHostView: View {
                     CardContainer {
                         VStack(alignment: .leading, spacing: 12) {
                             Toggle("Payday notifications", isOn: $paydayNotifications)
-                                .onChange(of: paydayNotifications) { on in
-                                    if on {
-                                        NotificationScheduler.requestAuthorizationIfNeeded()
-                                        // TODO: schedule upcoming payday notifications
-                                    } else {
-                                        NotificationScheduler.removeAllScheduled(matching: "payday_")
-                                    }
+                                .onChange(of: paydayNotifications) { _ in
+                                    Task { await rescheduleNotifications(using: context) }
                                 }
                             Toggle("Bill due reminders", isOn: $billDueNotifications)
-                                .onChange(of: billDueNotifications) { on in
-                                    if on {
-                                        NotificationScheduler.requestAuthorizationIfNeeded()
-                                        // TODO: schedule upcoming bill due reminders using billReminderDays
-                                    } else {
-                                        NotificationScheduler.removeAllScheduled(matching: "billdue_")
-                                    }
+                                .onChange(of: billDueNotifications) { _ in
+                                    Task { await rescheduleNotifications(using: context) }
                                 }
 
                             HStack {
@@ -228,6 +218,9 @@ struct SettingsHostView: View {
                                 .labelsHidden()
                                 .pickerStyle(.menu)
                                 .disabled(!billDueNotifications)
+                                .onChange(of: billReminderDays) { _ in
+                                    Task { await rescheduleNotifications(using: context) }
+                                }
                             }
 
                             Text("You’ll be prompted to allow notifications the first time you enable these.")
@@ -398,10 +391,9 @@ struct SettingsHostView: View {
     }
 }
 
-// MARK: - Inline Help Sheet (unchanged)
-private struct CSVHelpSheet: View {
+// MARK: - Inline Help Sheet + ResetDataView + CardContainer (unchanged from your version)
+private struct CSVHelpSheet: View { /* … keep your existing implementation … */
     @Environment(\.dismiss) private var dismiss
-
     private let example = """
 Name,Amount,Category,DueDate,Recurrence,EndDate,Notes
 "Rent",1500.00,Housing,2025-09-05,monthly,,Optional note
@@ -409,7 +401,6 @@ Name,Amount,Category,DueDate,Recurrence,EndDate,Notes
 "Gym",29.99,Health,2025-09-12,monthly,2026-09-12,Annual promo
 "Car Insurance",120.00,Auto,2025-09-15,monthly,,
 """
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -429,7 +420,6 @@ Include a header row with these columns:
 
 Dates should be in your local timezone. Unknown or blank values will be skipped safely.
 """)
-
                     GroupBox("Example") {
                         ScrollView(.horizontal) {
                             Text(example)
@@ -438,7 +428,6 @@ Dates should be in your local timezone. Unknown or blank values will be skipped 
                                 .padding(.vertical, 8)
                         }
                     }
-
                     Text("Tips")
                         .font(.headline)
                     Text("""
@@ -459,42 +448,31 @@ Dates should be in your local timezone. Unknown or blank values will be skipped 
     }
 }
 
-// MARK: - Reset View (unchanged)
-private struct ResetDataView: View {
+private struct ResetDataView: View { /* … keep your existing implementation … */
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-
     @State private var confirming = false
     @State private var didReset = false
-
     var body: some View {
         Form {
             Section {
-                Button(role: .destructive) {
-                    confirming = true
-                } label: {
+                Button(role: .destructive) { confirming = true } label: {
                     Label("Erase all local data", systemImage: "trash")
                 }
-            } footer: {
-                Text("This cannot be undone. Consider exporting a backup first.")
-            }
+            } footer: { Text("This cannot be undone. Consider exporting a backup first.") }
         }
         .navigationTitle("Reset Data")
         .alert("Erase all data?", isPresented: $confirming) {
             Button("Cancel", role: .cancel) { }
             Button("Erase", role: .destructive) {
-                // TODO: Implement your actual purge logic using SwiftData context
-                // try? context.delete(model:) / fetch & delete
+                // TODO: implement purge
                 didReset = true
                 dismiss()
             }
-        } message: {
-            Text("All Pay Schedules, Incomes, and Bills will be removed from this device.")
-        }
+        } message: { Text("All Pay Schedules, Incomes, and Bills will be removed from this device.") }
     }
 }
 
-// MARK: - Card Container (shared look)
 private struct CardContainer<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {

@@ -50,6 +50,11 @@ struct ContentView: View {
                 .tag(MainTab.settings)
         }
         .environmentObject(router)
+
+        // 🔔 Add notification scheduling + deep-link handlers at the root:
+        .withNotificationsBootstrap()    // keeps notifications up to date
+        .withNotificationDeepLinking()   // optional: present PaycheckDetail from a tap event
+
         // Apply the appearance override at the top-most level so it affects the entire app.
         .preferredColorScheme(preferredScheme)
         .onAppear {
