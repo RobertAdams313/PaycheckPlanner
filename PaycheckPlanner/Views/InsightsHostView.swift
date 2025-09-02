@@ -5,6 +5,8 @@
 //  Created by Rob on 8/24/25.
 //  Updated on 9/2/25 – Insights: centered summary, persistent legend with dim + quick view,
 //  no gray backgrounds, small header-style coverage line under title.
+//  Updated on 9/2/25 (Card UI): Wrap primary groups in blur cards to match Plan/Bills,
+//  without changing behaviors or layout intent.
 //
 import SwiftUI
 import SwiftData
@@ -97,59 +99,85 @@ struct InsightsHostView: View {
                     .listRowBackground(Color.clear)       // ensure no colored background behind it
                 }
 
-                // MARK: Summary (centered)
+                // MARK: Summary (centered) in Card
                 Section {
-                    summaryCentered(
-                        income: totals.income,
-                        bills: totals.bills,
-                        remaining: totals.remaining
-                    )
-                }
-
-                // MARK: Spending by Category (persistent legend; select dims others + slide-down quick view)
-                if !categorySlices.isEmpty {
-                    Section("Spending by Category") {
-                        donutView
-                        categoryList
-
-                        if let cat = selectedCategory,
-                           let lines = billsByCategory[cat],
-                           !lines.isEmpty {
-                            quickViewDetails(category: cat, lines: lines)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                                .animation(.snappy, value: selectedCategory)
-                        }
+                    CardContainer {
+                        summaryCentered(
+                            income: totals.income,
+                            bills: totals.bills,
+                            remaining: totals.remaining
+                        )
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
                     }
                 }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                .listRowBackground(Color.clear)
 
-                // MARK: Upcoming Periods (unchanged)
-                Section("Upcoming Periods") {
-                    ForEach(breakdowns) { b in
-                        NavigationLink {
-                            PaycheckDetailView(breakdown: b)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(b.period.payday, format: .dateTime.month().day().year())
-                                        .font(.body)
-                                        .fontWeight(.semibold)
-                                    Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing) {
-                                    Text("Bills \(formatCurrency(b.billsTotal))")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text(formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal))
-                                        .bold()
+                // MARK: Spending by Category (donut + legend + optional quick view) in Card
+                if !categorySlices.isEmpty {
+                    Section {
+                        CardContainer {
+                            VStack(spacing: 12) {
+                                donutView
+                                categoryList
+
+                                if let cat = selectedCategory,
+                                   let lines = billsByCategory[cat],
+                                   !lines.isEmpty {
+                                    quickViewDetails(category: cat, lines: lines)
+                                        .transition(.move(edge: .top).combined(with: .opacity))
+                                        .animation(.snappy, value: selectedCategory)
+                                        .padding(.top, 6)
                                 }
                             }
-                            .padding(.vertical, 4)
+                            .padding(12)
                         }
                     }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listRowBackground(Color.clear)
                 }
+
+                // MARK: Upcoming Periods in Card (unchanged content)
+                Section {
+                    CardContainer {
+                        VStack(spacing: 0) {
+                            ForEach(breakdowns) { b in
+                                NavigationLink {
+                                    PaycheckDetailView(breakdown: b)
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(b.period.payday, format: .dateTime.month().day().year())
+                                                .font(.body)
+                                                .fontWeight(.semibold)
+                                            Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        VStack(alignment: .trailing) {
+                                            Text("Bills \(formatCurrency(b.billsTotal))")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Text(formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal))
+                                                .bold()
+                                        }
+                                    }
+                                    .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.plain)
+
+                                if b.id != breakdowns.last?.id {
+                                    Divider().padding(.leading, 4)
+                                }
+                            }
+                        }
+                        .padding(12)
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
+                .listRowBackground(Color.clear)
             }
             .navigationTitle("Insights")
             .toolbar {
@@ -183,6 +211,8 @@ struct InsightsHostView: View {
                     ShareSheet(activityItems: [url])
                 }
             }
+            .scrollContentBackground(.hidden) // let material cards contrast against the app bg
+            .background(Color.clear)
         }
     }
 
@@ -202,7 +232,6 @@ struct InsightsHostView: View {
             .foregroundStyle(by: .value("Category", item.category))
             .opacity(selectedCategory == nil || selectedCategory == item.category ? 1.0 : 0.30)
             .annotation(position: .overlay, alignment: .center) {
-                // show percent only for reasonably large wedges
                 let pct = (total == 0) ? 0 : (item.amount / total * 100)
                 if pct >= 7 {
                     Text("\(Int((pct as NSDecimalNumber).doubleValue.rounded()))%")
@@ -213,7 +242,7 @@ struct InsightsHostView: View {
         }
         .frame(height: 220)
         .chartLegend(.hidden)
-        .chartForegroundStyleScale(domain: domain, range: range) // <- correct overload
+        .chartForegroundStyleScale(domain: domain, range: range)
         .accessibilityHidden(true)
     }
 
@@ -278,7 +307,6 @@ struct InsightsHostView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(line.bill.name.isEmpty ? "Untitled Bill" : line.bill.name)
-                        // No dueDate on AllocatedBillLine; show occurrences × each
                         Text("\(line.occurrences) × \(formatCurrency(line.amountEach))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -333,5 +361,21 @@ struct InsightsHostView: View {
         f.maximumFractionDigits = 2
         f.minimumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
+    }
+}
+
+// MARK: - Card Container (shared look: blurred, rounded, subtle border + shadow)
+private struct CardContainer<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12))
+            )
+            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
     }
 }

@@ -3,209 +3,225 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
-//
-
-
-//
-//  IncomeEditorView.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 8/24/25.
-//  Updated on 9/1/25
+//  Updated on 9/2/25 – Amount editor clears on focus & auto-commits on blur; safe schedule bindings; Delete button
 //
 
 import SwiftUI
 import SwiftData
 
+// MARK: - Currency helpers
+
+private func ppFormatCurrency(_ d: Decimal) -> String {
+    let n = NSDecimalNumber(decimal: d)
+    let f = NumberFormatter()
+    f.numberStyle = .currency
+    f.maximumFractionDigits = 2
+    f.minimumFractionDigits = 2
+    return f.string(from: n) ?? "$0.00"
+}
+
+private func parseDecimal(from s: String) -> Decimal {
+    // Accept digits and one dot/comma; simple, locale-tolerant parse.
+    let dec = s
+        .replacingOccurrences(of: ",", with: ".")
+        .filter { "0123456789.".contains($0) }
+    return Decimal(string: dec) ?? 0
+}
+
 struct IncomeEditorView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
-    /// If non-nil, we’re editing an existing source.
-    let existing: IncomeSource?
+    // Bind to the SwiftData model that was passed in.
+    @Bindable var source: IncomeSource
 
-    // MARK: - Inputs
-    @State private var name: String = ""
-    @State private var amount: Decimal = 0
-    @State private var variable: Bool = false
-
-    // Schedule fields
-    @State private var frequency: PayFrequency = .biweekly
-    @State private var anchorDate: Date = .now
-    @State private var semimonthlyFirstDay: Int = 1
-    @State private var semimonthlySecondDay: Int = 15
-
-    // UI
-    @FocusState private var nameFocused: Bool
+    // Text editing state for currency field
+    @State private var amountText: String = ""
     @FocusState private var amountFocused: Bool
-    @State private var showSaveError = false
 
-    // MARK: - Init with existing model data
-    init(existing: IncomeSource? = nil) {
-        self.existing = existing
-        // State is hydrated in .task (after modelContext is available) for reliability.
+    @State private var showDeleteConfirm = false
+
+    // MARK: - Init
+
+    init(existing: IncomeSource) {
+        self._source = Bindable(existing)
+        // amountText is set in .onAppear so we can decide to show "" when value is 0
     }
+
+    // MARK: - View
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Source") {
-                    TextField("Name", text: $name)
-                        .textInputAutocapitalization(.words)
-                        .submitLabel(.next)
-                        .focused($nameFocused)
+        Form {
+            Section("Details") {
+                TextField("Name", text: $source.name)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
 
-                    // Currency input using a Double bridge to keep Decimal in the model
-                    TextField("Amount", value: amountDoubleBinding, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
-                        .keyboardType(.decimalPad)
-                        .monospacedDigit()
-                        .focused($amountFocused)
-
-                    Toggle("Variable amount", isOn: $variable)
-                        .help("Turn on if this income varies; you can still set a typical amount.")
-                }
-
-                Section("Schedule") {
-                    Picker("Frequency", selection: $frequency) {
-                        Text("Weekly").tag(PayFrequency.weekly)
-                        Text("Biweekly").tag(PayFrequency.biweekly)
-                        Text("Semimonthly").tag(PayFrequency.semimonthly)
-                        Text("Monthly").tag(PayFrequency.monthly)
-                    }
-
-                    DatePicker("Start Date", selection: $anchorDate, displayedComponents: .date)
-                        .help("The reference date used to compute future paydays.")
-
-                    if frequency == .semimonthly {
-                        HStack {
-                            Stepper(value: $semimonthlyFirstDay, in: 1...28) {
-                                Text("First day")
+                // Currency editor (String-backed)
+                TextField("Default amount", text: $amountText, prompt: Text("$0.00"))
+                    .keyboardType(.decimalPad)
+                    .focused($amountFocused)
+                    .onChange(of: amountFocused) { focused in
+                        if focused {
+                            // Clear placeholder for clean entry when focusing an empty/zero value
+                            if source.defaultAmount == 0, amountText.isEmpty || amountText == ppFormatCurrency(0) {
+                                amountText = ""
                             }
-                            Spacer()
-                            Text("\(semimonthlyFirstDay)").foregroundStyle(.secondary)
-                        }
-
-                        HStack {
-                            Stepper(value: $semimonthlySecondDay, in: 1...28) {
-                                Text("Second day")
-                            }
-                            Spacer()
-                            Text("\(semimonthlySecondDay)").foregroundStyle(.secondary)
+                        } else {
+                            commitAmount() // auto-confirm as soon as focus leaves
                         }
                     }
-                }
+                    .onSubmit { commitAmount() } // in case a keyboard “Done” is present
 
-                if showSaveError {
-                    Section {
-                        Text("Couldn’t save your income. Please try again.")
-                            .foregroundStyle(.red)
-                            .font(.footnote)
+                Toggle("Variable amount", isOn: $source.variable)
+                    .onTapGesture { amountFocused = false } // finalize before toggling
+            }
+
+            Section("Schedule") {
+                // Ensure a schedule exists, then build safe explicit bindings (no force unwraps)
+                let sched = ensureSchedule()
+
+                let freqBinding = Binding<PayFrequency>(
+                    get: { sched.frequency },
+                    set: { new in
+                        sched.frequency = new
+                        source.schedule = sched
                     }
+                )
+
+                let dateBinding = Binding<Date>(
+                    get: { sched.anchorDate },
+                    set: { new in
+                        sched.anchorDate = new
+                        source.schedule = sched
+                    }
+                )
+
+                let firstDayBinding = Binding<Int>(
+                    get: { sched.semimonthlyFirstDay },
+                    set: { new in
+                        sched.semimonthlyFirstDay = new
+                        source.schedule = sched
+                    }
+                )
+
+                let secondDayBinding = Binding<Int>(
+                    get: { sched.semimonthlySecondDay },
+                    set: { new in
+                        sched.semimonthlySecondDay = new
+                        source.schedule = sched
+                    }
+                )
+
+                Picker("Frequency", selection: freqBinding) {
+                    Text("One-time").tag(PayFrequency.once)
+                    Text("Weekly").tag(PayFrequency.weekly)
+                    Text("Bi-weekly").tag(PayFrequency.biweekly)
+                    Text("Semi-monthly").tag(PayFrequency.semimonthly)
+                    Text("Monthly").tag(PayFrequency.monthly)
+                }
+                .onTapGesture { amountFocused = false } // commit amount before interacting
+
+                DatePicker("Starts", selection: dateBinding, displayedComponents: .date)
+                    .onTapGesture { amountFocused = false }
+
+                if sched.frequency == .semimonthly {
+                    Stepper(value: firstDayBinding, in: 1...28) {
+                        Text("First day: \(sched.semimonthlyFirstDay)")
+                    }
+                    .onTapGesture { amountFocused = false }
+
+                    Stepper(value: secondDayBinding, in: 1...28) {
+                        Text("Second day: \(sched.semimonthlySecondDay)")
+                    }
+                    .onTapGesture { amountFocused = false }
                 }
             }
-            .navigationTitle(existing == nil ? "New Income" : "Edit Income")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(!canSave)
+
+            Section {
+                Button(role: .destructive) {
+                    amountFocused = false // finalize any edit before delete
+                    showDeleteConfirm = true
+                } label: {
+                    Label("Delete Income", systemImage: "trash")
                 }
             }
-            .task { hydrateFromExistingIfNeeded() }
         }
-    }
-
-    // MARK: - Validation
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    // MARK: - Amount <-> Double bridge (for TextField w/ .currency format)
-    private var amountDoubleBinding: Binding<Double> {
-        Binding<Double>(
-            get: {
-                (amount as NSDecimalNumber).doubleValue
-            },
-            set: { newVal in
-                amount = Decimal(Double(newVal))
-            }
-        )
-    }
-
-    // MARK: - Load existing values into state
-    private func hydrateFromExistingIfNeeded() {
-        guard let src = existing else { return }
-        name = src.name
-        amount = src.defaultAmount
-        variable = src.variable
-
-        if let sched = src.schedule {
-            frequency = sched.frequency
-            anchorDate = sched.anchorDate
-            semimonthlyFirstDay = sched.semimonthlyFirstDay
-            semimonthlySecondDay = sched.semimonthlySecondDay
-        }
-    }
-
-    // MARK: - Save
-    private func save() {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
-
-        if let src = existing {
-            // Update existing
-            src.name = trimmedName
-            src.defaultAmount = amount
-            src.variable = variable
-
-            if let sched = src.schedule {
-                applyScheduleEdits(to: sched)
-                if sched.source == nil { sched.source = src } // critical
+        .navigationTitle(source.name.isEmpty ? "Income" : source.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // Seed the editor string. If zero, start blank so placeholder shows and clears on focus.
+            if source.defaultAmount == 0 {
+                amountText = ""
             } else {
-                let sched = IncomeSchedule(source: src)
-                applyScheduleEdits(to: sched)
-                context.insert(sched)
-                src.schedule = sched
+                amountText = ppFormatCurrency(source.defaultAmount)
             }
+            _ = ensureSchedule()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") {
+                    amountFocused = false // commit then close
+                    dismiss()
+                }
+            }
+        }
+        .alert("Delete this income?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) { performDelete() }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will remove the income source\(source.schedule != nil ? " and its schedule" : ""). This action cannot be undone.")
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Confirm/commit the `amountText` into `source.defaultAmount`, and reformat the field.
+    private func commitAmount() {
+        let newValue = parseDecimal(from: amountText)
+        source.defaultAmount = newValue
+        // Show formatted currency unless zero (let placeholder remain visually)
+        if newValue == 0 {
+            amountText = ""
         } else {
-            // New income + schedule
-            let src = IncomeSource(name: trimmedName, defaultAmount: amount, variable: variable)
-            let sched = IncomeSchedule(source: src)
-            applyScheduleEdits(to: sched)
-
-            context.insert(src)
-            context.insert(sched)
-            src.schedule = sched
-        }
-
-        do {
-            try context.save()
-            dismiss()
-            // inside save() after try context.save()
-            do {
-                try context.save()
-                print("✅ Saved income: \(trimmedName) amount: \(amount)")
-                dismiss()
-            } catch {
-                print("❌ Save failed: \(error.localizedDescription)")
-                showSaveError = true
-            }
-
-        } catch {
-            showSaveError = true
+            amountText = ppFormatCurrency(newValue)
         }
     }
 
-
-    // MARK: - Apply schedule edits (the helper you were missing)
-    private func applyScheduleEdits(to sched: IncomeSchedule) {
-        sched.frequency = frequency
-        sched.anchorDate = anchorDate
-        sched.semimonthlyFirstDay = semimonthlyFirstDay
-        sched.semimonthlySecondDay = semimonthlySecondDay
+    /// Guarantee a schedule exists so bindings are safe.
+    @discardableResult
+    private func ensureSchedule() -> IncomeSchedule {
+        if let s = source.schedule {
+            return s
+        } else {
+            let s = IncomeSchedule(source: source, frequency: .biweekly, anchorDate: Date())
+            source.schedule = s
+            return s
+        }
     }
+
+    private func performDelete() {
+        if let s = source.schedule { context.delete(s) }
+        context.delete(source)
+        do { try context.save() } catch { /* non-fatal */ }
+        dismiss()
+    }
+}
+
+// MARK: - Preview
+
+#Preview {
+    let container = try! ModelContainer(
+        for: IncomeSource.self, IncomeSchedule.self,
+        configurations: .init(isStoredInMemoryOnly: true)
+    )
+
+    let src = IncomeSource(name: "Paycheck", defaultAmount: 2500, variable: false, schedule: nil)
+    let sched = IncomeSchedule(source: src, frequency: .biweekly, anchorDate: Date())
+    src.schedule = sched
+
+    return NavigationStack {
+        IncomeEditorView(existing: src)
+    }
+    .modelContainer(container)
 }

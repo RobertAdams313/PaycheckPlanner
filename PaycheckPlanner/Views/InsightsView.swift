@@ -3,10 +3,9 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
+//  Card UI pass: wrap “Summary” + “By Paycheck” in blur cards to match other tabs,
+//  leaving the logic and labels exactly as-is.
 //
-
-
 import SwiftUI
 import SwiftData
 
@@ -32,31 +31,53 @@ struct InsightsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Summary (next \(breakdowns.count) paychecks)") {
-                    HStack { Text("Income"); Spacer(); Text(formatCurrency(totals.income)).bold() }
-                    HStack { Text("Bills");  Spacer(); Text(formatCurrency(totals.bills)).bold() }
-                    HStack { Text("Leftover"); Spacer(); Text(formatCurrency(totals.leftover)).bold() }
-                }
-
-                Section("By Paycheck") {
-                    ForEach(breakdowns) { b in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(b.period.payday, format: .dateTime.month().day().year())
-                                Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing) {
-                                Text("Bills \(formatCurrency(b.billsTotal))").font(.caption)
-                                Text(formatCurrency(b.incomeTotal - b.billsTotal)).bold()
-                            }
+                // Summary card
+                Section {
+                    CardContainer {
+                        VStack(spacing: 8) {
+                            HStack { Text("Income"); Spacer(); Text(formatCurrency(totals.income)).bold() }
+                            HStack { Text("Bills");  Spacer(); Text(formatCurrency(totals.bills)).bold() }
+                            HStack { Text("Leftover"); Spacer(); Text(formatCurrency(totals.leftover)).bold() }
                         }
-                        .padding(.vertical, 4)
+                        .padding(12)
                     }
                 }
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                .listRowBackground(Color.clear)
+
+                // By Paycheck card
+                Section {
+                    CardContainer {
+                        VStack(spacing: 0) {
+                            ForEach(breakdowns) { b in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(b.period.payday, format: .dateTime.month().day().year())
+                                        Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing) {
+                                        Text("Bills \(formatCurrency(b.billsTotal))").font(.caption)
+                                        Text(formatCurrency(b.incomeTotal - b.billsTotal)).bold()
+                                    }
+                                }
+                                .padding(.vertical, 8)
+
+                                if b.id != breakdowns.last?.id {
+                                    Divider().padding(.leading, 4)
+                                }
+                            }
+                        }
+                        .padding(12)
+                    }
+                }
+                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
+                .listRowBackground(Color.clear)
             }
             .navigationTitle("Insights")
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
         }
     }
 
@@ -64,5 +85,21 @@ struct InsightsView: View {
         let n = NSDecimalNumber(decimal: v)
         let f = NumberFormatter(); f.numberStyle = .currency; f.currencyCode = code; f.maximumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
+    }
+}
+
+// Local card container for this file as well, so either view compiles standalone.
+private struct CardContainer<Content: View>: View {
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12))
+            )
+            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
     }
 }

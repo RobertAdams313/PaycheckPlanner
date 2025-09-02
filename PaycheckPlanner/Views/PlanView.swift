@@ -51,116 +51,61 @@ struct PlanView: View {
         previousCount > 99 ? "99+" : "\(previousCount)"
     }
 
+    // MARK: - Body (centered column layout)
+
     var body: some View {
         NavigationStack {
             Group {
                 if schedules.isEmpty {
                     emptyState
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color(.systemGroupedBackground))
                 } else {
-                    List {
-                        if let current = upcomingBreakdowns.first {
-                            Section {
+                    ScrollView {
+                        VStack(spacing: 16) {
+
+                            // Current
+                            if let current = upcomingBreakdowns.first {
+                                currentHeader(for: current)
                                 NavigationLink {
                                     PaycheckDetailView(breakdown: current)
                                 } label: {
                                     periodCard(current, emphasizeCurrent: true)
                                 }
-                                .listRowInsets(EdgeInsets())
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                            } header: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(formatDateRange(start: current.period.start, end: current.period.end))
-                                        .font(.headline)
-                                    Text("Current Pay Period")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .textCase(nil)
+                                .buttonStyle(.plain) // keep card look
                             }
-                        }
 
-                        let upcoming = Array(upcomingBreakdowns.dropFirst())
-                        if !upcoming.isEmpty {
-                            Section("Upcoming") {
+                            // Upcoming
+                            let upcoming = Array(upcomingBreakdowns.dropFirst())
+                            if !upcoming.isEmpty {
+                                sectionTitle("Upcoming")
                                 ForEach(upcoming) { b in
                                     NavigationLink {
                                         PaycheckDetailView(breakdown: b)
                                     } label: {
                                         periodCard(b, emphasizeCurrent: false)
                                     }
-                                    .listRowInsets(EdgeInsets())
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
+                                    .buttonStyle(.plain)
                                 }
                             }
-                        }
 
-                        // Link to history only if we have previous periods
-                        if previousCount > 0 {
-                            Section {
-                                // Card-like NavigationLink matching other cards, badge stays to right
+                            // Previous periods entry (centered card-like button)
+                            if previousCount > 0 {
                                 NavigationLink {
                                     PreviousPeriodsView()
                                 } label: {
-                                    VStack(spacing: 0) {
-                                        HStack(spacing: 8) {
-                                            Spacer(minLength: 0)
-
-                                            Text("Show Previous Pay Periods")
-                                                .font(.headline)
-                                                .fontWeight(.semibold)
-                                                .multilineTextAlignment(.center)
-                                                .lineLimit(1)
-                                                .truncationMode(.tail)
-
-                                            Text(previousCountDisplay)
-                                                .font(.caption2.weight(.semibold))
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
-                                                .background(
-                                                    Capsule(style: .continuous)
-                                                        .fill(.thinMaterial)
-                                                )
-                                                .overlay(
-                                                    Capsule(style: .continuous)
-                                                        .strokeBorder(.quaternary, lineWidth: 0.5)
-                                                )
-                                                .accessibilityHidden(true)
-
-                                            Spacer(minLength: 0)
-                                        }
-                                        .frame(minHeight: 56) // HIG tap target with room for badge
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 8)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                            .fill(.ultraThinMaterial)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                                    .strokeBorder(.separator.opacity(0.15))
-                                            )
-                                            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-                                    )
-                                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                                    .padding(.horizontal)
-                                    .padding(.vertical, 6)
+                                    previousCard()
                                 }
-                                .buttonStyle(PressCardStyle()) // 🔹 pressed effect wired in
+                                .buttonStyle(PressCardStyle())
                                 .accessibilityLabel("Show Previous Pay Periods, \(previousCountDisplay)")
-                                .listRowInsets(EdgeInsets())
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
                             }
                         }
+                        // Column width + centering
+                        .frame(maxWidth: 700)               // tweak 640–760 to taste
+                        .padding(.horizontal)
+                        .padding(.vertical, 12)
                     }
-                    // Remove all separators and background; provide subtle background
-                    .listStyle(.plain)
-                    .listRowSeparator(.hidden)
-                    .listSectionSeparator(.hidden, edges: .all)
-                    .scrollContentBackground(.hidden)
+                    .frame(maxWidth: .infinity, alignment: .center) // center the scroll content
                     .background(Color(.systemGroupedBackground))
                 }
             }
@@ -214,6 +159,33 @@ struct PlanView: View {
         }
     }
 
+    // MARK: - Section headers (centered-friendly)
+
+    private func currentHeader(for b: CombinedBreakdown) -> some View {
+        VStack(spacing: 2) {
+            Text(formatDateRange(start: b.period.start, end: b.period.end))
+                .font(.headline)
+            Text("Current Pay Period")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.top, 4)
+        .accessibilityAddTraits(.isHeader)
+    }
+
     // MARK: - Card row
 
     private func periodCard(_ b: CombinedBreakdown, emphasizeCurrent: Bool) -> some View {
@@ -254,6 +226,56 @@ struct PlanView: View {
                 )
                 .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
         )
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+    }
+
+    // MARK: - Previous periods card
+
+    private func previousCard() -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+
+                Text("Show Previous Pay Periods")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text(previousCountDisplay)
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(.thinMaterial)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(.quaternary, lineWidth: 0.5)
+                    )
+                    .accessibilityHidden(true)
+
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 56) // HIG tap target with room for badge
+            .padding(.horizontal, 6)
+            .padding(.vertical, 8)
+        }
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.separator.opacity(0.15))
+                )
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .padding(.horizontal)
         .padding(.vertical, 6)
     }
