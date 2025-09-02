@@ -11,66 +11,100 @@
 //  StoreHub.swift
 //  PaycheckPlanner
 //
-//  Provides two SwiftData containers (iCloud + Local) and hands out the right ModelContext.
+//  Created by Rob on 8/24/25.
+//  Updated on 9/1/25
 //
 
-import SwiftUI
+import Foundation
 import SwiftData
 
-enum DataStoreChoice: String, CaseIterable, Identifiable {
-    case iCloud
-    case local
-
-    var id: String { rawValue }
-    var title: String {
-        switch self {
-        case .iCloud: return "iCloud (sync across devices)"
-        case .local:  return "On This iPhone/iPad"
-        }
-    }
-}
-
-@MainActor
+/// Central place to build and manage SwiftData containers for the app and previews.
 final class StoreHub {
+
+    // MARK: - Singleton
     static let shared = StoreHub()
+    private init() {}
 
-    // MARK: - Containers
-    // IMPORTANT: Keep this model list in sync with your app's models.
-    private let models: [any PersistentModel.Type] = [
-        IncomeSource.self,
-        IncomeSchedule.self,
-        Bill.self,
-        PaySchedule.self
-    ]
+    // MARK: - Cached containers (safe, non-throwing, property-style)
+    /// iCloud-backed (CloudKit private DB). Falls back to in-memory preview if construction fails.
+    lazy var iCloudContainer: ModelContainer = {
+        (try? buildICloudContainer()) ?? Self.previewContainer()
+    }()
 
-    let iCloudContainer: ModelContainer
-    let localContainer: ModelContainer
+    /// Local-only (no CloudKit). Falls back to in-memory preview if construction fails.
+    lazy var localContainer: ModelContainer = {
+        (try? buildLocalContainer()) ?? Self.previewContainer()
+    }()
 
-    private init() {
-        // iCloud-backed container (uses default CloudKit container for the app)
-        iCloudContainer = try! ModelContainer(
-            for: models,
-            configurations: ModelConfiguration(
-                "iCloud",
-                cloudKitDatabase: .automatic
-            )
-        )
-
-        // Local-only container (no CloudKit)
-        localContainer = try! ModelContainer(
-            for: models,
-            configurations: ModelConfiguration(
-                "Local",
-                cloudKitDatabase: .none
-            )
+    // MARK: - Throwing builders (instance)
+    func buildICloudContainer() throws -> ModelContainer {
+        try Self.makeContainer(
+            models: Self.appModels(),
+            inMemory: false,
+            cloudKitDatabase: .private("iCloud.com.robadams.PaycheckPlanner") // <- your CK container ID
         )
     }
 
-    // MARK: - Context selection
-    func context(for choice: DataStoreChoice) -> ModelContext {
-        switch choice {
-        case .iCloud: return ModelContext(iCloudContainer)
-        case .local:  return ModelContext(localContainer)
-        }
+    func buildLocalContainer() throws -> ModelContainer {
+        try Self.makeContainer(
+            models: Self.appModels(),
+            inMemory: false,
+            cloudKitDatabase: .none
+        )
+    }
+
+    // MARK: - Throwing builders (static conveniences)
+    static func iCloudContainer() throws -> ModelContainer {
+        try Self.shared.buildICloudContainer()
+    }
+
+    static func localContainer() throws -> ModelContainer {
+        try Self.shared.buildLocalContainer()
+    }
+
+    // MARK: - App/Preview helpers
+    static func liveContainer() throws -> ModelContainer {
+        try makeContainer(models: appModels(), inMemory: false, cloudKitDatabase: .none)
+    }
+
+    static func previewContainer() -> ModelContainer {
+        let schema = Schema(appModels())
+        let cfg = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: true,
+            cloudKitDatabase: .none
+        )
+        return (try? ModelContainer(for: schema, configurations: cfg)) ?? {
+            let empty = Schema([])
+            let emptyCfg = ModelConfiguration(schema: empty, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            return try! ModelContainer(for: empty, configurations: emptyCfg)
+        }()
+    }
+
+    // MARK: - Core factory
+    /// Build a `ModelContainer` from an **array** of model types (use Schema to avoid variadic issues).
+    static func makeContainer(
+        models: [any PersistentModel.Type],
+        inMemory: Bool = false,
+        cloudKitDatabase: ModelConfiguration.CloudKitDatabase = .none
+    ) throws -> ModelContainer {
+
+        let schema = Schema(models)
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: inMemory,
+            cloudKitDatabase: cloudKitDatabase
+        )
+        return try ModelContainer(for: schema, configurations: config)
+    }
+
+    // MARK: - Single source of truth for all @Model types
+    static func appModels() -> [any PersistentModel.Type] {
+        [
+            IncomeSource.self,
+            IncomeSchedule.self,
+            Bill.self,
+            PaySchedule.self
+        ]
     }
 }

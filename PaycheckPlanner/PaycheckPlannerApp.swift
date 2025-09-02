@@ -19,8 +19,7 @@ import SwiftData
 struct PaycheckPlannerApp: App {
     var body: some Scene {
         WindowGroup {
-            // ContentView owns AppRouter & TabView
-            ContentView()
+            AppBootstrapView()   // <-- was ContentView()
         }
         .modelContainer(for: [
             IncomeSource.self,

@@ -54,7 +54,13 @@
 		D4A4B1512E65C22600E62BF3 /* CategoryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1502E65C22600E62BF3 /* CategoryPicker.swift */; };
 		D4A4B1532E65C29900E62BF3 /* PreviousPeriodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1522E65C29900E62BF3 /* PreviousPeriodsView.swift */; };
 		D4A4B1552E65C95F00E62BF3 /* DateSpan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */; };
-		D4A4B1592E65ED4100E62BF3 /* DataRepair.swift in Resources */ = {isa = PBXBuildFile; fileRef = D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */; };
+		D4C92E3C2E665BBF000AC97A /* DataMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E3B2E665BBF000AC97A /* DataMigrator.swift */; };
+		D4C92E3E2E665C02000AC97A /* SettingsDataStoreSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E3D2E665C02000AC97A /* SettingsDataStoreSection.swift */; };
+		D4C92E402E665C64000AC97A /* MigrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E3F2E665C64000AC97A /* MigrationSheet.swift */; };
+		D4C92E482E6661A1000AC97A /* StoreHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E472E6661A1000AC97A /* StoreHub.swift */; };
+		D4C92E492E6661F4000AC97A /* ModelContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E452E665E09000AC97A /* ModelContext.swift */; };
+		D4C92E4A2E6661F4000AC97A /* DataRepair.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */; };
+		D4C92E4C2E6671A6000AC97A /* NameAutoCapModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E4B2E6671A6000AC97A /* NameAutoCapModifier.swift */; };
 		E17EDB1ABD45DE5F92DF9CF0 /* SharedAppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */; };
 		E8CCBA6F5C9DF1360F3541DD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5E4D6F5F9586F1EC432208AA /* README.md */; };
 /* End PBXBuildFile section */
@@ -116,6 +122,12 @@
 		D4A4B1522E65C29900E62BF3 /* PreviousPeriodsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviousPeriodsView.swift; sourceTree = "<group>"; };
 		D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateSpan.swift; sourceTree = "<group>"; };
 		D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepair.swift; sourceTree = "<group>"; };
+		D4C92E3B2E665BBF000AC97A /* DataMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataMigrator.swift; sourceTree = "<group>"; };
+		D4C92E3D2E665C02000AC97A /* SettingsDataStoreSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDataStoreSection.swift; sourceTree = "<group>"; };
+		D4C92E3F2E665C64000AC97A /* MigrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationSheet.swift; sourceTree = "<group>"; };
+		D4C92E452E665E09000AC97A /* ModelContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContext.swift; sourceTree = "<group>"; };
+		D4C92E472E6661A1000AC97A /* StoreHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreHub.swift; sourceTree = "<group>"; };
+		D4C92E4B2E6671A6000AC97A /* NameAutoCapModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameAutoCapModifier.swift; sourceTree = "<group>"; };
 		E559409DD9FF9D7AB3FE325F /* PaycheckPlannerWatchApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaycheckPlannerWatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9F98E1E268036F31114E498 /* Shared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -182,6 +194,12 @@
 		AA4E55A826E5809B3B1B0FAC /* PaycheckPlanner */ = {
 			isa = PBXGroup;
 			children = (
+				D4C92E4B2E6671A6000AC97A /* NameAutoCapModifier.swift */,
+				D4C92E472E6661A1000AC97A /* StoreHub.swift */,
+				D4C92E452E665E09000AC97A /* ModelContext.swift */,
+				D4C92E3F2E665C64000AC97A /* MigrationSheet.swift */,
+				D4C92E3D2E665C02000AC97A /* SettingsDataStoreSection.swift */,
+				D4C92E3B2E665BBF000AC97A /* DataMigrator.swift */,
 				D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */,
 				D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */,
 				D447D5D02E5B798900710C67 /* AppRouter.swift */,
@@ -376,7 +394,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D4A4B1592E65ED4100E62BF3 /* DataRepair.swift in Resources */,
 				9B2FC636E07C1016E5184051 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -416,6 +433,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4C92E492E6661F4000AC97A /* ModelContext.swift in Sources */,
+				D4C92E4A2E6661F4000AC97A /* DataRepair.swift in Sources */,
 				301B2FEC2E6359CB001D09D0 /* CompatTypes.swift in Sources */,
 				301B2FEB2E635993001D09D0 /* UIStrings.swift in Sources */,
 				D4A4B1532E65C29900E62BF3 /* PreviousPeriodsView.swift in Sources */,
@@ -430,9 +449,12 @@
 				D447D5C12E5B710D00710C67 /* PaycheckDetailView.swift in Sources */,
 				30EF32F62E5B3EFF0009E58B /* LiquidGlassToggleModifier.swift in Sources */,
 				30A4BAF42E63727800492CB9 /* CurrencyAmountField.swift in Sources */,
+				D4C92E402E665C64000AC97A /* MigrationSheet.swift in Sources */,
+				D4C92E482E6661A1000AC97A /* StoreHub.swift in Sources */,
 				D447D5A22E5B603100710C67 /* IncomeSourcesView.swift in Sources */,
 				D447D59C2E5B5FE800710C67 /* PaycheckPlannerApp.swift in Sources */,
 				D447D5B92E5B6DAC00710C67 /* DateUtils.swift in Sources */,
+				D4C92E3E2E665C02000AC97A /* SettingsDataStoreSection.swift in Sources */,
 				D447D5812E5B54ED00710C67 /* BillsView.swift in Sources */,
 				D447D5A42E5B604100710C67 /* IncomeEditorView.swift in Sources */,
 				3050D2AD2E5A1570007416C0 /* SharedAppGroup.swift in Sources */,
@@ -440,9 +462,11 @@
 				30EF32B12E5A73790009E58B /* ExportMenu.swift in Sources */,
 				D447D5972E5B5CA700710C67 /* PlanView.swift in Sources */,
 				D447D5D52E5B848800710C67 /* CSVExporter.swift in Sources */,
+				D4C92E3C2E665BBF000AC97A /* DataMigrator.swift in Sources */,
 				30EF32A92E5A6FD60009E58B /* AppTheme.swift in Sources */,
 				30EF32AD2E5A71400009E58B /* CalendarManager.swift in Sources */,
 				30EF32F82E5B3F360009E58B /* SplashOverlay.swift in Sources */,
+				D4C92E4C2E6671A6000AC97A /* NameAutoCapModifier.swift in Sources */,
 				D447D5C52E5B726300710C67 /* SafeAllocationEngine.swift in Sources */,
 				D447D5C32E5B724900710C67 /* Models_SwiftData.swift in Sources */,
 				D447D5CD2E5B76E800710C67 /* AddOrEditBillView.swift in Sources */,
@@ -471,7 +495,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = PaycheckPlanner/PaycheckPlanner.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = "PaycheckPlanner/Info-App.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
@@ -740,7 +764,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = PaycheckPlanner/PaycheckPlanner.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = "PaycheckPlanner/Info-App.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Paycheck Planner";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";

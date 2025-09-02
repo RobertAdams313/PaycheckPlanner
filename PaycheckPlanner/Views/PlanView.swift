@@ -11,7 +11,7 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
+//  Updated on 9/1/25
 //
 
 import SwiftUI
@@ -32,7 +32,8 @@ struct PlanView: View {
 
     // MARK: - Period sources
 
-    /// Current + future periods (current is first)
+    /// Current + future periods (current is first). The new engine guarantees the first
+    /// period spans “today” when there’s a single recurring schedule (weekly/biweekly/monthly/semimonthly).
     private var upcomingBreakdowns: [CombinedBreakdown] {
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
@@ -43,15 +44,14 @@ struct PlanView: View {
 
     /// Number of previous periods available (ended strictly before today).
     private var previousCount: Int {
-        let pastStart = Calendar.current.date(byAdding: .day, value: -180, to: Date())
-            ?? Date().addingTimeInterval(-180*86400)
+        let today = Calendar.current.startOfDay(for: Date.now)
+        let pastStart = Calendar.current.date(byAdding: .day, value: -180, to: today) ?? today
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
             count: 60,
             from: pastStart
         )
         let allocated = SafeAllocationEngine.allocate(bills: bills, into: periods)
-        let today = Calendar.current.startOfDay(for: Date())
         return allocated.filter { $0.period.end <= today }.count
     }
 
@@ -77,7 +77,15 @@ struct PlanView: View {
                                 .listRowInsets(EdgeInsets())
                                 .listRowBackground(Color.clear)
                             } header: {
-                                Text("Current Pay Period")
+                                // HIG polish: date range first, “Current Pay Period” under it
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(formatDateRange(start: current.period.start, end: current.period.end))
+                                        .font(.headline)
+                                    Text("Current Pay Period")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .textCase(nil)
                             }
                         }
 
@@ -141,6 +149,52 @@ struct PlanView: View {
         .task {
             await repairIncomeBacklinks()
         }
+        // 🔍 DEBUG PROBE (background): print schedules and computed periods/incomes to Xcode console
+        .task {
+            do {
+                try await context.background { bg in
+                    let cal = Calendar.current
+                    let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"
+
+                    let schedules = try bg.fetch(FetchDescriptor<IncomeSchedule>())
+
+                    print("🧭 Schedules in store: \(schedules.count)")
+                    for s in schedules {
+                        let srcName = (s.source?.name.isEmpty == false) ? s.source!.name : "Unnamed"
+                        print(" – \(srcName) | \(s.frequency) @ \(f.string(from: s.anchorDate)) | semi \(s.semimonthlyFirstDay)/\(s.semimonthlySecondDay)")
+
+                        // Single-schedule probe
+                        let probe = CombinedPayEventsEngine.combinedPeriods(
+                            schedules: [s],
+                            count: 2,
+                            from: Date.now,
+                            using: cal
+                        )
+                        if let p = probe.first {
+                            print("    grid: \(f.string(from: p.start)) → \(f.string(from: p.end)) (payday \(f.string(from: p.payday)))")
+                        }
+                    }
+
+                    let periods = CombinedPayEventsEngine.combinedPeriods(
+                        schedules: schedules,
+                        count: 6,
+                        from: Date.now,
+                        using: cal
+                    )
+
+                    print("🔎 Period probe (combined): \(periods.count) periods")
+                    for p in periods {
+                        let inc = p.incomes
+                            .map { "\($0.source.name.isEmpty ? "Untitled" : $0.source.name): \(NSDecimalNumber(decimal: $0.amount))" }
+                            .joined(separator: ", ")
+                        print(" • \(f.string(from: p.start)) → \(f.string(from: p.end)) (payday \(f.string(from: p.payday))) | incomes: [\(inc)]  total=\(NSDecimalNumber(decimal: p.incomeTotal))")
+                    }
+                }
+            } catch {
+                // Don’t crash the UI; just log the probe error.
+                print("🔧 PlanView probe failed: \(error)")
+            }
+        }
     }
 
     // MARK: - Card row
@@ -178,7 +232,6 @@ struct PlanView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.background.opacity(0.8))
                 .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
-
         )
         .padding(.horizontal)
         .padding(.vertical, 6)
@@ -217,10 +270,10 @@ struct PlanView: View {
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
                         .frame(height: 6)
-                        .foregroundStyle(Color.primary.opacity(0.9))
+                        .foregroundStyle(Color.primary.opacity(0.9))   // “Remaining” rail
                     RoundedRectangle(cornerRadius: 3)
                         .frame(width: geo.size.width * CGFloat(billsFrac), height: 6)
-                        .foregroundStyle(.tint)
+                        .foregroundStyle(.tint)                        // Bills filling up
                 }
             }
             .frame(height: 6)
@@ -275,6 +328,7 @@ struct PlanView: View {
         let eComp = cal.dateComponents([.year, .month, .day], from: end)
 
         let dfDay = DateFormatter(); dfDay.dateFormat = "d"
+        let dfMonth = DateFormatter.cached("MMM")
         let dfMonthDay = DateFormatter(); dfMonthDay.dateFormat = "MMM d"
         let dfMonthDayYear = DateFormatter(); dfMonthDayYear.dateFormat = "MMM d, yyyy"
 
@@ -282,8 +336,7 @@ struct PlanView: View {
             return "\(dfMonthDayYear.string(from: start))–\(dfMonthDayYear.string(from: end))"
         }
         if sComp.month == eComp.month {
-            let month = DateFormatter.cached("MMM").string(from: start)
-            return "\(month) \(dfDay.string(from: start))–\(dfDay.string(from: end)), \(sComp.year!)"
+            return "\(dfMonth.string(from: start)) \(dfDay.string(from: start))–\(dfDay.string(from: end)), \(sComp.year!)"
         } else {
             return "\(dfMonthDay.string(from: start))–\(dfMonthDay.string(from: end)), \(sComp.year!)"
         }
@@ -295,6 +348,7 @@ struct PlanView: View {
         f.numberStyle = .currency
         f.currencyCode = code
         f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
     }
 
@@ -303,26 +357,19 @@ struct PlanView: View {
     private func repairIncomeBacklinks() async {
         do {
             let srcs = try context.fetch(FetchDescriptor<IncomeSource>())
-            let scheds = try context.fetch(FetchDescriptor<IncomeSchedule>())
-
             var changed = false
 
-            // Ensure each source's schedule points back to the source
             for src in srcs {
                 if let sched = src.schedule, sched.source == nil {
                     sched.source = src
                     changed = true
                 }
             }
-
-            // If any schedules are orphaned but clearly linked, you could
-            // add additional heuristics here. For now we rely on src.schedule.
-
             if changed {
                 try context.save()
             }
         } catch {
-            // non-fatal; the view will still render
+            // non-fatal
             print("Backlink repair failed: \(error)")
         }
     }

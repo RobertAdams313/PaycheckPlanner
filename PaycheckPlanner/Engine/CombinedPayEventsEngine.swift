@@ -11,6 +11,10 @@
 //  CombinedPayEventsEngine.swift
 //  PaycheckPlanner
 //
+//  Rewritten to drive period generation from IncomeSchedule,
+//  fixing biweekly slicing and ensuring incomes are counted
+//  on each period end (payday).
+//
 
 import Foundation
 import SwiftData
@@ -43,15 +47,15 @@ enum CombinedPayEventsEngine {
     /// we use that schedule to define the period grid:
     ///     [previous payday ≤ now] → [next payday ≥ now] → [next] → ...
     ///
-    /// That guarantees the first period shown is the **current open period** (e.g., Aug 22–Sep 5).
+    /// This guarantees the first period shown is the **current open period**.
     /// We still include incomes from *all* schedules that pay exactly on each period `end` (payday).
     ///
-    /// If there are multiple recurring schedules, we fall back to the merged-paydays method.
+    /// If there are multiple recurring schedules, we fall back to a merged-paydays method.
     static func combinedPeriods(
         schedules: [IncomeSchedule],
         count: Int,
-        from startFrom: Date = .now,
-        using cal: Calendar = .init(identifier: .gregorian)
+        from startFrom: Date = Date.now,
+        using cal: Calendar = Calendar(identifier: .gregorian)
     ) -> [CombinedPeriod] {
         guard count > 0 else { return [] }
 
@@ -63,7 +67,7 @@ enum CombinedPayEventsEngine {
             return periodsUsingAnchor(anchorSch, allSchedules: schedules, count: count, lower: lower, cal: cal)
         }
 
-        // Fallback: merged-paydays method (kept, but seeded with "previous payday" to ensure an open period).
+        // Fallback: merged-paydays method (works for multiple overlapping schedules).
         return periodsUsingMergedGrid(schedules: schedules, count: count, lower: lower, cal: cal)
     }
 
@@ -76,41 +80,32 @@ enum CombinedPayEventsEngine {
         lower: Date,
         cal: Calendar
     ) -> [CombinedPeriod] {
-        // previous payday at/before now
-        guard let prev = previousPayday(for: anchor, atOrBefore: lower, cal: cal) else {
-            return [] // shouldn’t happen for recurring; safeguard
-        }
+        guard let prev = previousPayday(for: anchor, atOrBefore: lower, cal: cal) else { return [] }
 
-        // next N paydays ≥ now
         var nexts = nextPaydays(for: anchor, count: count, from: lower, using: cal)
-
         // Ensure we have enough bounds (prev + nexts >= count+1)
-        while nexts.count < count, let last = nexts.last ?? Optional.some(prev) {
-            // extend further
+        while nexts.count < count, let last = nexts.last {
             let more = nextPaydays(for: anchor, count: 4, from: last, using: cal)
             if more.isEmpty { break }
             nexts.append(contentsOf: more)
         }
 
-        // Build periods between consecutive bounds: prev -> nexts[0], nexts[0] -> nexts[1], ...
-        var periods: [CombinedPeriod] = []
-        var bounds: [Date] = [prev] + nexts
+        let bounds = [prev] + nexts
         let limit = min(count, max(0, bounds.count - 1))
 
+        var periods: [CombinedPeriod] = []
         for i in 0..<limit {
             let start = bounds[i]
             let end = bounds[i + 1]
 
-            // incomes that pay exactly on the end date (payday)
             let incomes: [PeriodIncome] = allSchedules.compactMap { sch in
                 guard paysOn(end, schedule: sch, cal: cal),
-                      let src = sch.source ?? sch.ownerSource else { return nil }
+                      let src = sch.source else { return nil }
                 return PeriodIncome(source: src, amount: src.defaultAmount)
             }
 
             periods.append(.init(start: start, end: end, payday: end, incomes: incomes))
         }
-
         return periods
     }
 
@@ -155,7 +150,7 @@ enum CombinedPayEventsEngine {
             let incomes: [PeriodIncome] = schedules.compactMap { sch in
                 let key = ObjectIdentifier(sch)
                 if let list = schedulePaydays[key], list.contains(next),
-                   let src = sch.source ?? sch.ownerSource {
+                   let src = sch.source {
                     return PeriodIncome(source: src, amount: src.defaultAmount)
                 }
                 return nil
@@ -167,7 +162,7 @@ enum CombinedPayEventsEngine {
 
         // Extend if needed
         if periods.count < count, let lastEnd = periods.last?.end {
-            var tail = Set(all)
+            var tail: Set<Date> = []
             for sch in schedules {
                 for d in nextPaydays(for: sch, count: count + 4, from: lastEnd, using: cal) {
                     tail.insert(d)
@@ -182,7 +177,7 @@ enum CombinedPayEventsEngine {
                 let incomes: [PeriodIncome] = schedules.compactMap { sch in
                     let key = ObjectIdentifier(sch)
                     if let list = schedulePaydays[key], list.contains(next),
-                       let src = sch.source ?? sch.ownerSource {
+                       let src = sch.source {
                         return PeriodIncome(source: src, amount: src.defaultAmount)
                     }
                     return nil
@@ -217,6 +212,8 @@ enum CombinedPayEventsEngine {
             return monthlyBackwards(anchor: sch.anchorDate, atOrBefore: lower, cal: cal)
         case .semimonthly:
             return semiMonthlyBackwards(anchor: sch.anchorDate, d1: sch.semimonthlyFirstDay, d2: sch.semimonthlySecondDay, atOrBefore: lower, cal: cal)
+        @unknown default:
+            return nil
         }
     }
 
@@ -228,7 +225,8 @@ enum CombinedPayEventsEngine {
     ) -> [Date] {
         switch sch.frequency {
         case .once:
-            return sch.anchorDate >= lower ? [stripTime(sch.anchorDate, cal: cal)] : []
+            let d = stripTime(sch.anchorDate, cal: cal)
+            return d >= stripTime(lower, cal: cal) ? [d] : []
         case .weekly:
             return strideDays(anchor: sch.anchorDate, every: 7, atOrAfter: lower, count: count, cal: cal)
         case .biweekly:
@@ -238,6 +236,8 @@ enum CombinedPayEventsEngine {
             return strideMonthly(anchor: sch.anchorDate, day: day, atOrAfter: lower, count: count, cal: cal)
         case .semimonthly:
             return strideSemiMonthly(anchor: sch.anchorDate, d1: sch.semimonthlyFirstDay, d2: sch.semimonthlySecondDay, atOrAfter: lower, count: count, cal: cal)
+        @unknown default:
+            return []
         }
     }
 
@@ -251,10 +251,10 @@ enum CombinedPayEventsEngine {
         case .once:
             return d == a
         case .weekly:
-            if let delta = cal.dateComponents([(.day)], from: a, to: d).day { return delta >= 0 && delta % 7 == 0 }
+            if let delta = cal.dateComponents([.day], from: a, to: d).day { return delta >= 0 && delta % 7 == 0 }
             return false
         case .biweekly:
-            if let delta = cal.dateComponents([(.day)], from: a, to: d).day { return delta >= 0 && delta % 14 == 0 }
+            if let delta = cal.dateComponents([.day], from: a, to: d).day { return delta >= 0 && delta % 14 == 0 }
             return false
         case .monthly:
             let anchorDay = max(1, min(28, cal.component(.day, from: a)))
@@ -264,6 +264,8 @@ enum CombinedPayEventsEngine {
             let ad2 = max(1, min(28, sch.semimonthlySecondDay))
             let dd = cal.component(.day, from: d)
             return dd == ad1 || dd == ad2
+        @unknown default:
+            return false
         }
     }
 
@@ -278,10 +280,13 @@ enum CombinedPayEventsEngine {
     ) -> [Date] {
         var occurrences: [Date] = []
         var d = stripTime(anchor, cal: cal)
+
+        // advance to the first occurrence >= lower
         while d < lower {
             guard let nd = cal.date(byAdding: .day, value: days, to: d) else { break }
             d = nd
         }
+        // collect
         while occurrences.count < count {
             occurrences.append(stripTime(d, cal: cal))
             guard let nd = cal.date(byAdding: .day, value: days, to: d) else { break }
@@ -298,19 +303,18 @@ enum CombinedPayEventsEngine {
         cal: Calendar
     ) -> [Date] {
         let dayClamped = max(1, min(28, day))
-        var cursor = stripToYearMonth(lower, cal: cal)
+        // start from the 1st of the month for `lower`
+        let startMonth = firstOfMonth(for: lower, cal: cal)
+        var cursor = startMonth
         var out: [Date] = []
+
         while out.count < count {
-            var comps = cursor; comps.day = dayClamped
-            if let candidate = cal.date(from: comps) {
+            if let candidate = cal.date(bySetting: .day, value: dayClamped, of: cursor) {
                 let c = stripTime(candidate, cal: cal)
                 if c >= stripTime(lower, cal: cal) { out.append(c) }
             }
-            // next month
-            if let nextMonth = cal.date(from: DateComponents(year: cursor.year, month: (cursor.month ?? 1) + 1)),
-               let nextComps = cal.dateComponents([.year, .month], from: nextMonth) as DateComponents? {
-                cursor = nextComps
-            } else { break }
+            guard let next = cal.date(byAdding: .month, value: 1, to: cursor) else { break }
+            cursor = next
         }
         return out
     }
@@ -324,12 +328,13 @@ enum CombinedPayEventsEngine {
         cal: Calendar
     ) -> [Date] {
         let days = [max(1, min(28, d1)), max(1, min(28, d2))].sorted()
-        var cursor = stripToYearMonth(lower, cal: cal)
+        let startMonth = firstOfMonth(for: lower, cal: cal)
+        var cursor = startMonth
         var out: [Date] = []
+
         while out.count < count {
             for dd in days {
-                var comps = cursor; comps.day = dd
-                if let candidate = cal.date(from: comps) {
+                if let candidate = cal.date(bySetting: .day, value: dd, of: cursor) {
                     let c = stripTime(candidate, cal: cal)
                     if c >= stripTime(lower, cal: cal) {
                         out.append(c)
@@ -337,11 +342,8 @@ enum CombinedPayEventsEngine {
                     }
                 }
             }
-            // next month
-            if let nextMonth = cal.date(from: DateComponents(year: cursor.year, month: (cursor.month ?? 1) + 1)),
-               let nextComps = cal.dateComponents([.year, .month], from: nextMonth) as DateComponents? {
-                cursor = nextComps
-            } else { break }
+            guard let next = cal.date(byAdding: .month, value: 1, to: cursor) else { break }
+            cursor = next
         }
         return out
     }
@@ -369,60 +371,51 @@ enum CombinedPayEventsEngine {
 
     private static func monthlyBackwards(anchor: Date, atOrBefore lower: Date, cal: Calendar) -> Date? {
         let day = max(1, min(28, cal.component(.day, from: anchor)))
-        var comps = cal.dateComponents([.year, .month], from: lower)
-        var candidate: Date? = nil
-        if let y = comps.year, let m = comps.month {
-            var c = DateComponents(); c.year = y; c.month = m; c.day = day
-            candidate = cal.date(from: c)
-            if let cand = candidate, stripTime(cand, cal: cal) > stripTime(lower, cal: cal) {
-                if let pm = cal.date(from: DateComponents(year: y, month: m - 1)),
-                   let pc = cal.dateComponents([.year, .month], from: pm) as DateComponents? {
-                    var pc2 = pc; pc2.day = day
-                    candidate = cal.date(from: pc2)
-                }
-            }
+        let thisMonth = firstOfMonth(for: lower, cal: cal)
+        if let candidate = cal.date(bySetting: .day, value: day, of: thisMonth) {
+            let c = stripTime(candidate, cal: cal)
+            if c <= stripTime(lower, cal: cal) { return c }
         }
-        return candidate.map { stripTime($0, cal: cal) }
+        if let prevMonth = cal.date(byAdding: .month, value: -1, to: thisMonth),
+           let candidate = cal.date(bySetting: .day, value: day, of: prevMonth) {
+            return stripTime(candidate, cal: cal)
+        }
+        return nil
     }
 
     private static func semiMonthlyBackwards(anchor: Date, d1: Int, d2: Int, atOrBefore lower: Date, cal: Calendar) -> Date? {
         let days = [max(1, min(28, d1)), max(1, min(28, d2))].sorted()
-        var comps = cal.dateComponents([.year, .month], from: lower)
+        let thisMonth = firstOfMonth(for: lower, cal: cal)
 
-        func candidate(in comps: DateComponents) -> Date? {
-            var cands: [Date] = []
+        var candidates: [Date] = []
+        for dd in days {
+            if let candidate = cal.date(bySetting: .day, value: dd, of: thisMonth) {
+                let c = stripTime(candidate, cal: cal)
+                if c <= stripTime(lower, cal: cal) { candidates.append(c) }
+            }
+        }
+        if let best = candidates.max() { return best }
+
+        if let prevMonth = cal.date(byAdding: .month, value: -1, to: thisMonth) {
+            candidates.removeAll()
             for dd in days {
-                var c = comps; c.day = dd
-                if let d = cal.date(from: c) {
-                    let s = stripTime(d, cal: cal)
-                    if s <= stripTime(lower, cal: cal) { cands.append(s) }
+                if let candidate = cal.date(bySetting: .day, value: dd, of: prevMonth) {
+                    candidates.append(stripTime(candidate, cal: cal))
                 }
             }
-            return cands.max()
-        }
-
-        if let cand = candidate(in: comps) { return cand }
-        if let pm = cal.date(from: DateComponents(year: comps.year, month: (comps.month ?? 1) - 1)),
-           let pc = cal.dateComponents([.year, .month], from: pm) as DateComponents? {
-            return candidate(in: pc)
+            return candidates.max()
         }
         return nil
     }
 
     // MARK: - Helpers
 
+    private static func firstOfMonth(for d: Date, cal: Calendar) -> Date {
+        let comps = cal.dateComponents([.year, .month], from: d)
+        return cal.date(from: comps).map { cal.startOfDay(for: $0) } ?? cal.startOfDay(for: d)
+    }
+
     private static func stripTime(_ d: Date, cal: Calendar) -> Date {
         cal.startOfDay(for: d)
     }
-
-    private static func stripToYearMonth(_ d: Date, cal: Calendar) -> DateComponents {
-        cal.dateComponents([.year, .month], from: d)
-    }
-}
-
-// MARK: - Convenience to reach IncomeSource/amount from schedule safely
-
-private extension IncomeSchedule {
-    var ownerSource: IncomeSource? { self.source }
-    var ownerSourceDefaultAmount: Decimal { (ownerSource?.defaultAmount) ?? 0 }
 }

@@ -11,6 +11,9 @@
 //  IncomeEditorView.swift
 //  PaycheckPlanner
 //
+//  Created by Rob on 8/24/25.
+//  Updated on 9/1/25
+//
 
 import SwiftUI
 import SwiftData
@@ -19,77 +22,122 @@ struct IncomeEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    /// When non-nil we edit, otherwise we create.
+    /// If non-nil, we’re editing an existing source.
     let existing: IncomeSource?
 
-    // MARK: - State
+    // MARK: - Inputs
     @State private var name: String = ""
     @State private var amount: Decimal = 0
     @State private var variable: Bool = false
 
+    // Schedule fields
     @State private var frequency: PayFrequency = .biweekly
     @State private var anchorDate: Date = .now
-    @State private var semiFirst: Int = 1
-    @State private var semiSecond: Int = 15
+    @State private var semimonthlyFirstDay: Int = 1
+    @State private var semimonthlySecondDay: Int = 15
 
+    // UI
+    @FocusState private var nameFocused: Bool
+    @FocusState private var amountFocused: Bool
     @State private var showSaveError = false
-    var onComplete: (Bool) -> Void = { _ in }
+
+    // MARK: - Init with existing model data
+    init(existing: IncomeSource? = nil) {
+        self.existing = existing
+        // State is hydrated in .task (after modelContext is available) for reliability.
+    }
 
     var body: some View {
-        Form {
-            Section("Income") {
-                TextField("Name", text: $name)
-                    .textInputAutocapitalization(.words)
-                    .disableAutocorrection(true)
+        NavigationStack {
+            Form {
+                Section("Source") {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.words)
+                        .submitLabel(.next)
+                        .focused($nameFocused)
 
-                CurrencyAmountField(amount: $amount)
+                    // Currency input using a Double bridge to keep Decimal in the model
+                    TextField("Amount", value: amountDoubleBinding, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
+                        .keyboardType(.decimalPad)
+                        .monospacedDigit()
+                        .focused($amountFocused)
 
-                Toggle("Variable amount", isOn: $variable)
-            }
+                    Toggle("Variable amount", isOn: $variable)
+                        .help("Turn on if this income varies; you can still set a typical amount.")
+                }
 
-            Section("Pay Schedule") {
-                Picker("Frequency", selection: $frequency) {
-                    ForEach(PayFrequency.allCases) { f in
-                        Text(uiName(for: f)).tag(f)
+                Section("Schedule") {
+                    Picker("Frequency", selection: $frequency) {
+                        Text("Weekly").tag(PayFrequency.weekly)
+                        Text("Biweekly").tag(PayFrequency.biweekly)
+                        Text("Semimonthly").tag(PayFrequency.semimonthly)
+                        Text("Monthly").tag(PayFrequency.monthly)
+                    }
+
+                    DatePicker("Anchor date", selection: $anchorDate, displayedComponents: .date)
+                        .help("The reference date used to compute future paydays.")
+
+                    if frequency == .semimonthly {
+                        HStack {
+                            Stepper(value: $semimonthlyFirstDay, in: 1...28) {
+                                Text("First day")
+                            }
+                            Spacer()
+                            Text("\(semimonthlyFirstDay)").foregroundStyle(.secondary)
+                        }
+
+                        HStack {
+                            Stepper(value: $semimonthlySecondDay, in: 1...28) {
+                                Text("Second day")
+                            }
+                            Spacer()
+                            Text("\(semimonthlySecondDay)").foregroundStyle(.secondary)
+                        }
                     }
                 }
 
-                switch frequency {
-                case .once, .weekly, .biweekly, .monthly:
-                    DatePicker(
-                        frequency == .once ? "Pay date" : "Anchor date",
-                        selection: $anchorDate,
-                        displayedComponents: .date
-                    )
-
-                case .semimonthly:
-                    Stepper("First day: \(semiFirst)", value: $semiFirst, in: 1...28)
-                    Stepper("Second day: \(semiSecond)", value: $semiSecond, in: 1...28)
+                if showSaveError {
+                    Section {
+                        Text("Couldn’t save your income. Please try again.")
+                            .foregroundStyle(.red)
+                            .font(.footnote)
+                    }
                 }
             }
-        }
-        .navigationTitle(existing == nil ? "New Income" : "Edit Income")
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel", role: .cancel) {
-                    onComplete(false); dismiss()
+            .navigationTitle(existing == nil ? "New Income" : "Edit Income")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { save() }
+                        .disabled(!canSave)
                 }
             }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save", action: save)
-                    .disabled(!canSave)
-            }
+            .task { hydrateFromExistingIfNeeded() }
         }
-        .onAppear(perform: bootstrap)
-        .alert("Couldn’t Save Income",
-               isPresented: $showSaveError,
-               actions: { Button("OK", role: .cancel) {} },
-               message: { Text("Please try again.") })
     }
 
-    // MARK: - Bootstrap
+    // MARK: - Validation
+    private var canSave: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
-    private func bootstrap() {
+    // MARK: - Amount <-> Double bridge (for TextField w/ .currency format)
+    private var amountDoubleBinding: Binding<Double> {
+        Binding<Double>(
+            get: {
+                (amount as NSDecimalNumber).doubleValue
+            },
+            set: { newVal in
+                amount = Decimal(Double(newVal))
+            }
+        )
+    }
+
+    // MARK: - Load existing values into state
+    private func hydrateFromExistingIfNeeded() {
         guard let src = existing else { return }
         name = src.name
         amount = src.defaultAmount
@@ -98,90 +146,66 @@ struct IncomeEditorView: View {
         if let sched = src.schedule {
             frequency = sched.frequency
             anchorDate = sched.anchorDate
-            semiFirst = sched.semimonthlyFirstDay
-            semiSecond = sched.semimonthlySecondDay
+            semimonthlyFirstDay = sched.semimonthlyFirstDay
+            semimonthlySecondDay = sched.semimonthlySecondDay
         }
     }
 
-    private var canSave: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && amount > 0
-    }
-
     // MARK: - Save
-
     private func save() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+
         if let src = existing {
             // Update existing
-            src.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            src.name = trimmedName
             src.defaultAmount = amount
             src.variable = variable
 
             if let sched = src.schedule {
                 applyScheduleEdits(to: sched)
-                // ensure back-link (in case it was missing)
-                if sched.source == nil { sched.source = src }
+                if sched.source == nil { sched.source = src } // critical
             } else {
-                let sched = IncomeSchedule()
+                let sched = IncomeSchedule(source: src)
                 applyScheduleEdits(to: sched)
                 context.insert(sched)
-                // set BOTH sides
                 src.schedule = sched
-                sched.source = src
             }
         } else {
-            // Create new
-            let src = IncomeSource(
-                name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                defaultAmount: amount,
-                variable: variable
-            )
-
-            let sched = IncomeSchedule()
+            // New income + schedule
+            let src = IncomeSource(name: trimmedName, defaultAmount: amount, variable: variable)
+            let sched = IncomeSchedule(source: src)
             applyScheduleEdits(to: sched)
 
-            // Insert before linking (safer for SwiftData to track)
             context.insert(src)
             context.insert(sched)
-
-            // set BOTH sides
             src.schedule = sched
-            sched.source = src
         }
 
         do {
             try context.save()
-            onComplete(true)
             dismiss()
+            // inside save() after try context.save()
+            do {
+                try context.save()
+                print("✅ Saved income: \(trimmedName) amount: \(amount)")
+                dismiss()
+            } catch {
+                print("❌ Save failed: \(error.localizedDescription)")
+                showSaveError = true
+            }
+
         } catch {
-            print("Failed to save income: \(error)")
             showSaveError = true
-            onComplete(false)
         }
     }
 
+
+    // MARK: - Apply schedule edits (the helper you were missing)
     private func applyScheduleEdits(to sched: IncomeSchedule) {
         sched.frequency = frequency
-        switch frequency {
-        case .once, .weekly, .biweekly, .monthly:
-            sched.anchorDate = anchorDate
-            // reset semimonthly days
-            sched.semimonthlyFirstDay = 1
-            sched.semimonthlySecondDay = 15
-
-        case .semimonthly:
-            sched.anchorDate = anchorDate
-            sched.semimonthlyFirstDay = semiFirst
-            sched.semimonthlySecondDay = semiSecond
-        }
-    }
-
-    private func uiName(for f: PayFrequency) -> String {
-        switch f {
-        case .once:        return "Once"
-        case .weekly:      return "Weekly"
-        case .biweekly:    return "Every 2 Weeks"
-        case .semimonthly: return "Twice a Month"
-        case .monthly:     return "Monthly"
-        }
+        sched.anchorDate = anchorDate
+        sched.semimonthlyFirstDay = semimonthlyFirstDay
+        sched.semimonthlySecondDay = semimonthlySecondDay
     }
 }

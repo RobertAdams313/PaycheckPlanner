@@ -49,41 +49,20 @@ final class PaySchedule {
 }
 
 @Model
-final class IncomeSource {
-    var name: String = ""
-    var defaultAmount: Decimal = Foundation.Decimal(0)
-    var variable: Bool = false
-
-    // Inferred optional relationship (one schedule per income)
-    var schedule: IncomeSchedule?
-
-    init(
-        name: String = "",
-        defaultAmount: Decimal = Foundation.Decimal(0),
-        variable: Bool = false,
-        schedule: IncomeSchedule? = nil
-    ) {
-        self.name = name
-        self.defaultAmount = defaultAmount
-        self.variable = variable
-        self.schedule = schedule
-    }
-}
-
-@Model
 final class IncomeSchedule {
-    // Inferred optional inverse back to IncomeSource
+    @Relationship(deleteRule: .cascade)
     var source: IncomeSource?
 
+    // ✅ Fully qualified defaults (no leading dots)
     var frequency: PayFrequency = PayFrequency.biweekly
-    var anchorDate: Date = Foundation.Date()
+    var anchorDate: Date = Date.now
     var semimonthlyFirstDay: Int = 1
     var semimonthlySecondDay: Int = 15
 
     init(
         source: IncomeSource? = nil,
         frequency: PayFrequency = PayFrequency.biweekly,
-        anchorDate: Date = Foundation.Date(),
+        anchorDate: Date = Date.now,
         semimonthlyFirstDay: Int = 1,
         semimonthlySecondDay: Int = 15
     ) {
@@ -94,6 +73,32 @@ final class IncomeSchedule {
         self.semimonthlySecondDay = semimonthlySecondDay
     }
 }
+
+
+@Model
+final class IncomeSource {
+    var name: String = ""
+    var defaultAmount: Decimal = 0
+    var variable: Bool = false
+
+    // Remove the inverse here to avoid the circular macro resolution
+    @Relationship
+    var schedule: IncomeSchedule?
+
+    init(
+        name: String = "",
+        defaultAmount: Decimal = 0,
+        variable: Bool = false,
+        schedule: IncomeSchedule? = nil
+    ) {
+        self.name = name
+        self.defaultAmount = defaultAmount
+        self.variable = variable
+        self.schedule = schedule
+    }
+}
+
+
 
 @Model
 final class Bill {
