@@ -1,13 +1,11 @@
-
-
 //
 //  InsightsHostView.swift
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
+//  Updated on 9/2/25 – Insights: centered summary, persistent legend with dim + quick view,
+//  no gray backgrounds, small header-style coverage line under title.
 //
-
 import SwiftUI
 import SwiftData
 import Charts
@@ -17,23 +15,43 @@ struct InsightsHostView: View {
     @Query(sort: \Bill.anchorDueDate, order: .forward) private var bills: [Bill]
 
     @AppStorage("planPeriodCount") private var planCount: Int = 4
+
+    // Export
     @State private var showExport = false
     @State private var exportURL: URL?
+
+    // Selection for dimming + quick-view
     @State private var selectedCategory: String?
 
+    // MARK: - Data windows
+
     private var breakdowns: [CombinedBreakdown] {
-        let periods = CombinedPayEventsEngine.combinedPeriods(schedules: schedules, count: max(planCount, 1))
+        let periods = CombinedPayEventsEngine.combinedPeriods(
+            schedules: schedules,
+            count: max(planCount, 1)
+        )
         return SafeAllocationEngine.allocate(bills: bills, into: periods)
     }
 
     private var totals: (income: Decimal, bills: Decimal, remaining: Decimal) {
         let income = breakdowns.reduce(0) { $0 + $1.incomeTotal }
+        let carry  = breakdowns.reduce(0) { $0 + $1.carryIn }
         let billsT = breakdowns.reduce(0) { $0 + $1.billsTotal }
-        let carry = breakdowns.reduce(0) { $0 + $1.carryIn }
         return (income, billsT, income + carry - billsT)
     }
 
-    // Category slices across the window (sorted by amount desc, stable)
+    // Coverage line: date range + period count
+    private var coverageText: String? {
+        guard let first = breakdowns.first?.period.start,
+              let last  = breakdowns.last?.period.end else { return nil }
+        let df = DateFormatter()
+        df.dateStyle = .medium
+        df.timeStyle = .none
+        let periodsCount = breakdowns.count
+        return "\(df.string(from: first)) – \(df.string(from: last)) • \(periodsCount) pay period\(periodsCount == 1 ? "" : "s")"
+    }
+
+    // Category slices across the visible window (sorted desc, > 0 only)
     private var categorySlices: [(category: String, amount: Decimal)] {
         let lines = breakdowns.flatMap(\.items)
         let grouped = Dictionary(grouping: lines, by: { ($0.bill.category.isEmpty ? "Uncategorized" : $0.bill.category) })
@@ -43,89 +61,92 @@ struct InsightsHostView: View {
             .filter { $0.amount > 0 }
     }
 
-    // Bills per category for the “details pop-down”
+    // For quick-view panel
     private var billsByCategory: [String: [AllocatedBillLine]] {
         let all = breakdowns.flatMap(\.items)
         return Dictionary(grouping: all, by: { $0.bill.category.isEmpty ? "Uncategorized" : $0.bill.category })
     }
 
-    // Income sources list (for export)
-    private var incomeSources: [IncomeSource] {
-        // prefer unique sources from schedules if you want to de-dupe
-        let set = Set(schedules.compactMap { $0.source })
-        return Array(set).sorted { $0.name < $1.name }
+    // Stable, HIG-safe color mapping (category -> Color)
+    private var categoryColorScale: [String: Color] {
+        var scale: [String: Color] = [:]
+        let palette: [Color] = [
+            .blue, .green, .orange, .pink, .purple, .teal, .indigo, .mint, .cyan, .brown, .red, .yellow
+        ]
+        for cat in categorySlices.map(\.category) {
+            let idx = abs(cat.hashValue) % palette.count
+            scale[cat] = palette[idx]
+        }
+        if scale["Uncategorized"] == nil { scale["Uncategorized"] = .gray }
+        return scale
     }
 
     var body: some View {
         NavigationStack {
             List {
-                // SUMMARY
-                Section("Summary (next \(breakdowns.count) paychecks)") {
-                    summaryRow(label: "Income", value: totals.income)
-                    summaryRow(label: "Bills", value: totals.bills)
-                    summaryRow(label: "Remaining", value: totals.remaining, bold: true)
+                // MARK: Coverage (header-style, no pill)
+                if let cov = coverageText {
+                    Section {
+                        Text(cov)
+                            .font(.subheadline.weight(.semibold)) // smaller than title, header-like
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 2)
+                    }
+                    .listRowInsets(EdgeInsets())          // remove pill-like horizontal inset look
+                    .listRowBackground(Color.clear)       // ensure no colored background behind it
                 }
 
-                // SPENDING BY CATEGORY (donut + fixed-order list; donut non-interactive)
+                // MARK: Summary (centered)
+                Section {
+                    summaryCentered(
+                        income: totals.income,
+                        bills: totals.bills,
+                        remaining: totals.remaining
+                    )
+                }
+
+                // MARK: Spending by Category (persistent legend; select dims others + slide-down quick view)
                 if !categorySlices.isEmpty {
                     Section("Spending by Category") {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(.quaternary)
-                            VStack(spacing: 12) {
-                                donutView
-                                categoryList
-                                if let cat = selectedCategory, let lines = billsByCategory[cat], !lines.isEmpty {
-                                    DisclosureGroup("Details: \(cat)") {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            ForEach(lines) { line in
-                                                HStack {
-                                                    Text(line.bill.name)
-                                                    Spacer()
-                                                    Text(formatCurrency(line.total)).monospacedDigit()
-                                                }
-                                                .font(.subheadline)
-                                            }
-                                        }
-                                        .padding(.top, 4)
-                                    }
-                                    .disclosureGroupStyle(.automatic)
-                                }
-                            }
-                            .padding(12)
+                        donutView
+                        categoryList
+
+                        if let cat = selectedCategory,
+                           let lines = billsByCategory[cat],
+                           !lines.isEmpty {
+                            quickViewDetails(category: cat, lines: lines)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                                .animation(.snappy, value: selectedCategory)
                         }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Spending by Category chart and list")
                     }
                 }
 
-                // UPCOMING PERIODS (reduce duplication—keep a clean row)
-                if !breakdowns.isEmpty {
-                    Section("Upcoming Paychecks") {
-                        ForEach(breakdowns) { b in
-                            NavigationLink {
-                                PaycheckDetailView(breakdown: b)
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(b.period.payday, format: .dateTime.month().day().year())
-                                            .font(.body)
-                                            .fontWeight(.semibold)
-                                        Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    VStack(alignment: .trailing) {
-                                        Text("Bills \(formatCurrency(b.billsTotal))")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Text(formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal))
-                                            .bold()
-                                    }
+                // MARK: Upcoming Periods (unchanged)
+                Section("Upcoming Periods") {
+                    ForEach(breakdowns) { b in
+                        NavigationLink {
+                            PaycheckDetailView(breakdown: b)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(b.period.payday, format: .dateTime.month().day().year())
+                                        .font(.body)
+                                        .fontWeight(.semibold)
+                                    Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
-                                .padding(.vertical, 4)
+                                Spacer()
+                                VStack(alignment: .trailing) {
+                                    Text("Bills \(formatCurrency(b.billsTotal))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal))
+                                        .bold()
+                                }
                             }
+                            .padding(.vertical, 4)
                         }
                     }
                 }
@@ -134,16 +155,13 @@ struct InsightsHostView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button("Export Upcoming Paychecks (CSV)") {
+                        Button("Export Upcoming (CSV)") {
                             exportURL = CSVExporter.upcomingCSV(breakdowns: breakdowns)
                             showExport = true
                         }
-                        Button("Export Bills (CSV)") {
-                            exportURL = CSVExporter.billsCSV(bills: bills)
-                            showExport = true
-                        }
-                        Button("Export Income Sources (CSV)") {
-                            exportURL = CSVExporter.incomeCSV(incomes: incomeSources)
+                        Divider()
+                        Button("Export Income (CSV)") {
+                            exportURL = CSVExporter.incomeCSV(incomes: incomeSources())
                             showExport = true
                         }
                         Divider()
@@ -151,7 +169,7 @@ struct InsightsHostView: View {
                             exportURL = CSVExporter.allCSV(
                                 breakdowns: breakdowns,
                                 bills: bills,
-                                incomes: incomeSources
+                                incomes: incomeSources()
                             )
                             showExport = true
                         }
@@ -168,10 +186,13 @@ struct InsightsHostView: View {
         }
     }
 
-    // MARK: - Donut + list
+    // MARK: - Donut (persistent, dims others when selected; no background)
 
     private var donutView: some View {
-        let total = categorySlices.reduce(Decimal(0)) { $0 + $1.amount }
+        let domain = categorySlices.map(\.category)
+        let range  = categorySlices.map { categoryColorScale[$0.category] ?? .accentColor }
+        let total  = categorySlices.reduce(Decimal(0)) { $0 + $1.amount }
+
         return Chart(categorySlices, id: \.category) { item in
             let value = NSDecimalNumber(decimal: item.amount).doubleValue
             SectorMark(
@@ -179,11 +200,11 @@ struct InsightsHostView: View {
                 innerRadius: .ratio(0.60)
             )
             .foregroundStyle(by: .value("Category", item.category))
-            .opacity(selectedCategory == nil || selectedCategory == item.category ? 1.0 : 0.33)
+            .opacity(selectedCategory == nil || selectedCategory == item.category ? 1.0 : 0.30)
             .annotation(position: .overlay, alignment: .center) {
-                // Percent inside the wedge (hide tiny slivers)
+                // show percent only for reasonably large wedges
                 let pct = (total == 0) ? 0 : (item.amount / total * 100)
-                if pct >= 5 {
+                if pct >= 7 {
                     Text("\(Int((pct as NSDecimalNumber).doubleValue.rounded()))%")
                         .font(.caption2.weight(.semibold))
                         .shadow(radius: 1)
@@ -191,53 +212,117 @@ struct InsightsHostView: View {
             }
         }
         .frame(height: 220)
-        .chartLegend(.hidden) // We provide our own stable list
-        .accessibilityLabel("Bills by category")
+        .chartLegend(.hidden)
+        .chartForegroundStyleScale(domain: domain, range: range) // <- correct overload
+        .accessibilityHidden(true)
     }
 
+    // MARK: - Legend (persistent; dims when not selected)
+
     private var categoryList: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             ForEach(categorySlices, id: \.category) { s in
                 Button {
                     withAnimation(.snappy) {
                         selectedCategory = (selectedCategory == s.category) ? nil : s.category
                     }
                 } label: {
-                    HStack {
-                        // Color well that matches chart’s mapping
+                    HStack(spacing: 12) {
                         Circle()
-                            .fill(Color.accentColor) // placeholder; Charts assigns a palette automatically
+                            .fill(categoryColorScale[s.category] ?? .accentColor)
                             .frame(width: 10, height: 10)
-                            .overlay(
-                                // Improve mapping by using a label; we’ll keep it simple
-                                Circle().strokeBorder(.quaternary)
-                            )
+                            .overlay(Circle().strokeBorder(.quaternary))
 
                         Text(s.category)
                             .font(.subheadline)
                             .lineLimit(1)
+
                         Spacer()
+
                         Text(formatCurrency(s.amount))
                             .font(.subheadline).monospacedDigit()
                     }
                     .contentShape(Rectangle())
-                    .padding(.vertical, 4)
-                    .opacity(selectedCategory == nil || selectedCategory == s.category ? 1.0 : 0.5)
+                    .padding(.vertical, 6)
+                    .opacity(selectedCategory == nil || selectedCategory == s.category ? 1.0 : 0.45)
                 }
                 .buttonStyle(.plain)
+
+                if s.category != categorySlices.last?.category {
+                    Divider().padding(.leading, 22)
+                }
             }
         }
+        .accessibilityLabel("Category breakdown list")
     }
 
-    // MARK: - Summary row
+    // MARK: - Quick-view details (slide-down inline panel)
 
-    private func summaryRow(label: String, value: Decimal, bold: Bool = false) -> some View {
-        HStack {
-            Text(label).foregroundStyle(.secondary)
-            Spacer()
-            if bold { Text(formatCurrency(value)).bold() }
-            else { Text(formatCurrency(value)) }
+    private func quickViewDetails(category: String, lines: [AllocatedBillLine]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Circle().fill(categoryColorScale[category] ?? .accentColor)
+                    .frame(width: 8, height: 8)
+                Text("Details: \(category)")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button("Close") {
+                    withAnimation(.snappy) { selectedCategory = nil }
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+            }
+            .padding(.bottom, 2)
+
+            ForEach(lines) { line in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(line.bill.name.isEmpty ? "Untitled Bill" : line.bill.name)
+                        // No dueDate on AllocatedBillLine; show occurrences × each
+                        Text("\(line.occurrences) × \(formatCurrency(line.amountEach))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(formatCurrency(line.total)).monospacedDigit()
+                }
+                .padding(.vertical, 2)
+            }
         }
+        .padding(.top, 6)
+    }
+
+    // MARK: - Summary (CENTERED)
+
+    private func summaryCentered(income: Decimal, bills: Decimal, remaining: Decimal) -> some View {
+        HStack(spacing: 24) {
+            summaryTileCentered(title: "Income", amount: income, emphasize: false)
+            summaryTileCentered(title: "Bills", amount: bills, emphasize: false)
+            summaryTileCentered(title: "Remaining", amount: remaining, emphasize: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func summaryTileCentered(title: String, amount: Decimal, emphasize: Bool) -> some View {
+        VStack(alignment: .center, spacing: 3) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(formatCurrency(amount))
+                .font(.headline.weight(emphasize ? .semibold : .regular))
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+    }
+
+    // MARK: - Utilities
+
+    private func incomeSources() -> [IncomeSource] {
+        let set = Set(schedules.compactMap { $0.source })
+        return Array(set).sorted { $0.name < $1.name }
     }
 
     private func formatCurrency(_ v: Decimal, code: String = "USD") -> String {
@@ -246,6 +331,7 @@ struct InsightsHostView: View {
         f.numberStyle = .currency
         f.currencyCode = code
         f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
     }
 }
