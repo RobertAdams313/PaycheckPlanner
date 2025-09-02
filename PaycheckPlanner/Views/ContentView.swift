@@ -7,54 +7,47 @@
 //  Copyright © 2025 Rob Adams. All rights reserved.
 //
 
+// Inside ContentView.swift
+
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
     @StateObject private var router = AppRouter()
-
-    // Read the same key your Settings picker writes: "system" | "light" | "dark"
-    @AppStorage("appearance") private var appearance: String = "system"
-
-    /// Map the string to an optional ColorScheme.
-    /// Returning nil tells SwiftUI to follow the system setting.
-    private var preferredScheme: ColorScheme? {
-        switch appearance {
-        case "light": return .light
-        case "dark":  return .dark
-        default:      return nil // "system"
-        }
-    }
+    @State private var didApplyDefaultTab = false
 
     var body: some View {
         TabView(selection: $router.tab) {
-            // PLAN
             NavigationStack { PlanView() }
                 .tabItem { Label("Plan", systemImage: "calendar") }
                 .tag(MainTab.plan)
 
-            // BILLS
             NavigationStack { BillsView() }
                 .tabItem { Label("Bills", systemImage: "list.bullet.rectangle") }
                 .tag(MainTab.bills)
 
-            // INCOME
             NavigationStack { IncomeSourcesView() }
                 .tabItem { Label("Income", systemImage: "banknote") }
                 .tag(MainTab.income)
 
-            // INSIGHTS
             NavigationStack { InsightsHostView() }
                 .tabItem { Label("Insights", systemImage: "chart.pie") }
                 .tag(MainTab.insights)
 
-            // SETTINGS
             NavigationStack { SettingsHostView() }
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(MainTab.settings)
         }
-        .environmentObject(router)
-        // Apply at the top-most level so all screens react instantly.
-        .preferredColorScheme(preferredScheme)
+        .onAppear {
+            guard !didApplyDefaultTab else { return }
+            didApplyDefaultTab = true
+            switch AppPreferences.defaultTabRaw {
+            case "bills": router.tab = .bills
+            case "income": router.tab = .income
+            case "insights": router.tab = .insights
+            case "settings": router.tab = .settings
+            default: router.tab = .plan
+            }
+        }
     }
 }

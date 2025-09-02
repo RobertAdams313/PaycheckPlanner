@@ -61,6 +61,10 @@
 		D4C92E492E6661F4000AC97A /* ModelContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E452E665E09000AC97A /* ModelContext.swift */; };
 		D4C92E4A2E6661F4000AC97A /* DataRepair.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1582E65ED4100E62BF3 /* DataRepair.swift */; };
 		D4C92E4C2E6671A6000AC97A /* NameAutoCapModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E4B2E6671A6000AC97A /* NameAutoCapModifier.swift */; };
+		D4C92E612E66CFF4000AC97A /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E602E66CFF3000AC97A /* AppPreferences.swift */; };
+		D4C92E632E66D010000AC97A /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E622E66D010000AC97A /* Haptics.swift */; };
+		D4C92E652E66D01E000AC97A /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E642E66D01E000AC97A /* NotificationScheduler.swift */; };
+		D4C92E672E66D02E000AC97A /* CSVImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C92E662E66D02E000AC97A /* CSVImporter.swift */; };
 		E17EDB1ABD45DE5F92DF9CF0 /* SharedAppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FB3EA279E7563D5F77B762B /* SharedAppGroup.swift */; };
 		E8CCBA6F5C9DF1360F3541DD /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 5E4D6F5F9586F1EC432208AA /* README.md */; };
 /* End PBXBuildFile section */
@@ -128,6 +132,10 @@
 		D4C92E452E665E09000AC97A /* ModelContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContext.swift; sourceTree = "<group>"; };
 		D4C92E472E6661A1000AC97A /* StoreHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreHub.swift; sourceTree = "<group>"; };
 		D4C92E4B2E6671A6000AC97A /* NameAutoCapModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NameAutoCapModifier.swift; sourceTree = "<group>"; };
+		D4C92E602E66CFF3000AC97A /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+		D4C92E622E66D010000AC97A /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		D4C92E642E66D01E000AC97A /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
+		D4C92E662E66D02E000AC97A /* CSVImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVImporter.swift; sourceTree = "<group>"; };
 		E559409DD9FF9D7AB3FE325F /* PaycheckPlannerWatchApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaycheckPlannerWatchApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9F98E1E268036F31114E498 /* Shared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -194,6 +202,10 @@
 		AA4E55A826E5809B3B1B0FAC /* PaycheckPlanner */ = {
 			isa = PBXGroup;
 			children = (
+				D4C92E662E66D02E000AC97A /* CSVImporter.swift */,
+				D4C92E642E66D01E000AC97A /* NotificationScheduler.swift */,
+				D4C92E622E66D010000AC97A /* Haptics.swift */,
+				D4C92E602E66CFF3000AC97A /* AppPreferences.swift */,
 				D4C92E4B2E6671A6000AC97A /* NameAutoCapModifier.swift */,
 				D4C92E472E6661A1000AC97A /* StoreHub.swift */,
 				D4C92E452E665E09000AC97A /* ModelContext.swift */,
@@ -451,10 +463,12 @@
 				30A4BAF42E63727800492CB9 /* CurrencyAmountField.swift in Sources */,
 				D4C92E402E665C64000AC97A /* MigrationSheet.swift in Sources */,
 				D4C92E482E6661A1000AC97A /* StoreHub.swift in Sources */,
+				D4C92E672E66D02E000AC97A /* CSVImporter.swift in Sources */,
 				D447D5A22E5B603100710C67 /* IncomeSourcesView.swift in Sources */,
 				D447D59C2E5B5FE800710C67 /* PaycheckPlannerApp.swift in Sources */,
 				D447D5B92E5B6DAC00710C67 /* DateUtils.swift in Sources */,
 				D4C92E3E2E665C02000AC97A /* SettingsDataStoreSection.swift in Sources */,
+				D4C92E632E66D010000AC97A /* Haptics.swift in Sources */,
 				D447D5812E5B54ED00710C67 /* BillsView.swift in Sources */,
 				D447D5A42E5B604100710C67 /* IncomeEditorView.swift in Sources */,
 				3050D2AD2E5A1570007416C0 /* SharedAppGroup.swift in Sources */,
@@ -463,6 +477,7 @@
 				D447D5972E5B5CA700710C67 /* PlanView.swift in Sources */,
 				D447D5D52E5B848800710C67 /* CSVExporter.swift in Sources */,
 				D4C92E3C2E665BBF000AC97A /* DataMigrator.swift in Sources */,
+				D4C92E652E66D01E000AC97A /* NotificationScheduler.swift in Sources */,
 				30EF32A92E5A6FD60009E58B /* AppTheme.swift in Sources */,
 				30EF32AD2E5A71400009E58B /* CalendarManager.swift in Sources */,
 				30EF32F82E5B3F360009E58B /* SplashOverlay.swift in Sources */,
@@ -475,6 +490,7 @@
 				3050D29B2E59FD60007416C0 /* SetupView.swift in Sources */,
 				D447D5CF2E5B77A300710C67 /* InsightsHostView.swift in Sources */,
 				D4A4B1512E65C22600E62BF3 /* CategoryPicker.swift in Sources */,
+				D4C92E612E66CFF4000AC97A /* AppPreferences.swift in Sources */,
 				D447D5BF2E5B70F000710C67 /* PaycheckOverviewView.swift in Sources */,
 				D447D5B62E5B6C5D00710C67 /* CombinedPayEventsEngine.swift in Sources */,
 				30EF32F42E5B3EE50009E58B /* SettingsView.swift in Sources */,
