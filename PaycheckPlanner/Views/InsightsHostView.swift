@@ -4,7 +4,7 @@
 //
 //  Created by Rob on 8/24/25.
 //  Updated on 9/3/25 – Async snapshot (SwiftData-safe), always-visible summary,
-//                      CardKit integration, compiler-friendly structure.
+//                      CardKit integration, compiler-friendly structure + iOS17-safe onChange.
 //
 import SwiftUI
 import SwiftData
@@ -48,9 +48,16 @@ struct InsightsHostView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .task { await recomputeSnapshots() }
-            .onChange(of: planCount) { _ in Task { await recomputeSnapshots() } }
-            .onChange(of: schedules.count) { _ in Task { await recomputeSnapshots() } }
-            .onChange(of: bills.count) { _ in Task { await recomputeSnapshots() } }
+            // iOS 17-safe change handlers
+            .onChangeValueCompat(planCount) { _, _ in
+                Task { await recomputeSnapshots() }
+            }
+            .onChangeValueCompat(schedules.count) { _, _ in
+                Task { await recomputeSnapshots() }
+            }
+            .onChangeValueCompat(bills.count) { _, _ in
+                Task { await recomputeSnapshots() }
+            }
         }
     }
 
@@ -148,7 +155,7 @@ struct InsightsHostView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(Edge.Set.vertical, 2)
+                    .padding(.vertical, 2)
             }
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
@@ -174,8 +181,8 @@ struct InsightsHostView: View {
                         remaining: totalsSnap.remaining
                     )
                 }
-                .padding(Edge.Set.vertical, 8)
-                .padding(Edge.Set.horizontal, 12)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
             }
         }
         .cardListRowInsets(top: 8, leading: 16, bottom: 4, trailing: 16)
@@ -196,10 +203,10 @@ struct InsightsHostView: View {
                             quickViewDetails(category: cat, lines: lines)
                                 .transition(.move(edge: .top).combined(with: .opacity))
                                 .animation(.snappy, value: selectedCategory)
-                                .padding(Edge.Set.top, 6)
+                                .padding(.top, 6)
                         }
                     }
-                    .padding(Edge.Set.all, 12)
+                    .padding(12)
                 }
             }
             .cardListRowInsets(top: 4, leading: 16, bottom: 4, trailing: 16)
@@ -216,7 +223,7 @@ struct InsightsHostView: View {
                         skeletonLine()
                         skeletonLine()
                     }
-                    .padding(Edge.Set.all, 12)
+                    .padding(12)
                 } else {
                     VStack(spacing: 0) {
                         ForEach(breakdownsSnap) { b in
@@ -228,11 +235,11 @@ struct InsightsHostView: View {
                             .buttonStyle(.plain)
 
                             if b.id != breakdownsSnap.last?.id {
-                                Divider().padding(Edge.Set.leading, 4)
+                                Divider().padding(.leading, 4)
                             }
                         }
                     }
-                    .padding(Edge.Set.all, 12)
+                    .padding(12)
                 }
             }
         }
@@ -261,7 +268,7 @@ struct InsightsHostView: View {
                     .bold()
             }
         }
-        .padding(Edge.Set.vertical, 8)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Donut + Legend
@@ -318,13 +325,13 @@ struct InsightsHostView: View {
                             .font(.subheadline).monospacedDigit()
                     }
                     .contentShape(Rectangle())
-                    .padding(Edge.Set.vertical, 6)
+                    .padding(.vertical, 6)
                     .opacity(selectedCategory == nil || selectedCategory == s.category ? 1.0 : 0.45)
                 }
                 .buttonStyle(.plain)
 
                 if s.category != categorySlices.last?.category {
-                    Divider().padding(Edge.Set.leading, 22)
+                    Divider().padding(.leading, 22)
                 }
             }
         }
@@ -347,7 +354,7 @@ struct InsightsHostView: View {
                 .buttonStyle(.borderless)
                 .font(.caption)
             }
-            .padding(Edge.Set.bottom, 2)
+            .padding(.bottom, 2)
 
             ForEach(lines) { line in
                 HStack {
@@ -360,10 +367,10 @@ struct InsightsHostView: View {
                     Spacer()
                     Text(formatCurrency(line.total)).monospacedDigit()
                 }
-                .padding(Edge.Set.vertical, 2)
+                .padding(.vertical, 2)
             }
         }
-        .padding(Edge.Set.top, 6)
+        .padding(.top, 6)
     }
 
     // MARK: - Summary (CENTERED)
@@ -465,5 +472,35 @@ struct InsightsHostView: View {
             .fill(.quaternary)
             .frame(height: 16)
             .redacted(reason: .placeholder)
+    }
+}
+
+// MARK: - iOS 17 onChange compatibility for plain values (Equatable)
+
+private struct OnChangeValueCompatModifier<Value: Equatable>: ViewModifier {
+    let value: Value
+    let action: (_ old: Value, _ new: Value) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.onChange(of: value) { oldValue, newValue in
+                action(oldValue, newValue)
+            }
+        } else {
+            // iOS 16: single-parameter version; we don’t have `oldValue`.
+            content.onChange(of: value) { newValue in
+                action(value, newValue)
+            }
+        }
+    }
+}
+
+private extension View {
+    /// Use this when you want iOS-17-safe `.onChange` for a plain Equatable value (not a Binding).
+    func onChangeValueCompat<Value: Equatable>(
+        _ value: Value,
+        perform: @escaping (_ old: Value, _ new: Value) -> Void
+    ) -> some View {
+        modifier(OnChangeValueCompatModifier(value: value, action: perform))
     }
 }

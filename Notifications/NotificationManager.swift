@@ -60,7 +60,7 @@ enum NotificationManager {
         count: Int,
         calendar: Calendar = .current
     ) async {
-        let center = UNUserNotificationCenter.current()
+        _ = UNUserNotificationCenter.current()
 
         // Build breakdowns with your convenience (periods -> allocation already applied).
         let breakdowns = CombinedPayEventsEngine.upcomingBreakdowns(
@@ -111,7 +111,7 @@ enum NotificationManager {
         count: Int,
         calendar: Calendar = .current
     ) async {
-        let center = UNUserNotificationCenter.current()
+        _ = UNUserNotificationCenter.current()
 
         let breakdowns = CombinedPayEventsEngine.upcomingBreakdowns(
             context: context,

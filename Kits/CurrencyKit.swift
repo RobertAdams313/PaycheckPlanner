@@ -56,7 +56,7 @@ enum CurrencyParser {
         // Keep only first decimal separator
         if let idx = cleaned.firstIndex(of: Character(decimalSeparator)) {
             let after = cleaned.index(after: idx)
-            var head = String(cleaned[..<after])
+            let head = String(cleaned[..<after])
             let tail = String(cleaned[after...]).replacingOccurrences(of: String(decimalSeparator), with: "")
             cleaned = head + tail
         }

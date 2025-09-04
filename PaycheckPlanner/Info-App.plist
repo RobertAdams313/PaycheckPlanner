@@ -41,8 +41,6 @@
 	<string>AppMark</string>
 	<key>UIStatusBarHidden</key>
 	<true/>
-	<key>UIMainStoryboardFile</key>
-	<string>LaunchScreen.storyboard</string>
 	<key>CFBundleDisplayName</key>
 	<string>Paycheck Planner</string>
 </dict>

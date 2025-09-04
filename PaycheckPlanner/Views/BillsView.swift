@@ -4,6 +4,7 @@
 //
 //  Created by Rob on 8/24/25.
 //  Updated on 9/2/25 – Card UI parity with PlanView; grouping toggle; fixes init label `existingBill:`
+//  Updated on 9/3/25 – Adds HIG-compliant swipe-to-delete with confirmation alert (without removing existing features)
 //
 
 import SwiftUI
@@ -50,6 +51,10 @@ struct BillsView: View {
 
     @State private var grouping: BillsGrouping = .dueDate
     @State private var draftNewBill: Bill?
+
+    // Delete confirmation state (HIG)
+    @State private var pendingDeleteBill: Bill?
+    @State private var showDeleteBillAlert = false
 
     // MARK: - Time buckets
 
@@ -150,6 +155,27 @@ struct BillsView: View {
                 BillEditorView(existingBill: newBill)
             }
         }
+        // HIG: destructive alert with clear Cancel
+        .alert(
+            Text("Delete Bill"),
+            isPresented: $showDeleteBillAlert,
+            presenting: pendingDeleteBill
+        ) { bill in
+            Button("Delete", role: .destructive) {
+                withAnimation {
+                    context.delete(bill)
+                    do { try context.save() } catch {
+                        // Optionally surface error UI
+                    }
+                }
+                pendingDeleteBill = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteBill = nil
+            }
+        } message: { bill in
+            Text("“\(bill.name.isEmpty ? "Untitled Bill" : bill.name)” will be removed from your plan.")
+        }
     }
 
     // MARK: - Sections
@@ -240,10 +266,21 @@ struct BillsView: View {
                                 Text(ppCurrency(bill.amount))
                                     .font(.headline.monospacedDigit())
                                     .foregroundStyle(.primary)
+                                    .accessibilityLabel("Amount \(ppCurrency(bill.amount))")
                             }
                         }
                     }
                     .buttonStyle(.plain)
+                    // NEW: Swipe-to-delete with confirmation
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            pendingDeleteBill = bill
+                            showDeleteBillAlert = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .accessibilityLabel("Delete bill")
+                    }
                 }
             }
         }

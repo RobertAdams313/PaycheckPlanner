@@ -5,6 +5,7 @@
 //  Created by Rob on 8/24/25.
 //  Updated on 9/3/25 – Adds “Main income” UI (star badge, swipe action, context menu) without removing existing behaviors.
 //                       Preserves Card UI parity; explicit NavigationLink(destination:) to avoid value-based routing stalls
+//                       + HIG-compliant swipe-to-delete with confirmation alert.
 //
 
 import SwiftUI
@@ -49,6 +50,10 @@ struct IncomeSourcesView: View {
     @State private var draftNewSource: IncomeSource?
     @State private var showingAdd = false
 
+    // Delete confirmation state (HIG)
+    @State private var pendingDeleteSource: IncomeSource?
+    @State private var showDeleteIncomeAlert = false
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
@@ -67,8 +72,18 @@ struct IncomeSourcesView: View {
                             }
                             .buttonStyle(.plain)
                             .contextMenu { mainContextMenu(for: src) }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                // Keep existing "Main" actions
                                 mainSwipeActions(for: src)
+
+                                // NEW: Delete action (requires confirm)
+                                Button(role: .destructive) {
+                                    pendingDeleteSource = src
+                                    showDeleteIncomeAlert = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .accessibilityLabel("Delete income source")
                             }
                         }
                     }
@@ -96,6 +111,27 @@ struct IncomeSourcesView: View {
                     IncomeEditorView(existing: newSrc)
                 }
             }
+        }
+        // HIG: destructive alert with clear Cancel
+        .alert(
+            Text("Delete Income Source"),
+            isPresented: $showDeleteIncomeAlert,
+            presenting: pendingDeleteSource
+        ) { src in
+            Button("Delete", role: .destructive) {
+                withAnimation {
+                    context.delete(src)
+                    do { try context.save() } catch {
+                        // Optionally surface error UI
+                    }
+                }
+                pendingDeleteSource = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteSource = nil
+            }
+        } message: { src in
+            Text("“\(src.name.isEmpty ? "Untitled Income" : src.name)” and its upcoming occurrences will be removed.")
         }
     }
 
@@ -166,12 +202,14 @@ struct IncomeSourcesView: View {
                 Text(currency(src.defaultAmount))
                     .font(.body.monospacedDigit())
                     .foregroundStyle(.primary)
+                    .accessibilityLabel("Amount \(currency(src.defaultAmount))")
             } else {
                 Image(systemName: "chevron.right")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
         }
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens income editor. Swipe for actions.")
     }

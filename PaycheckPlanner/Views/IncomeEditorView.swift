@@ -2,10 +2,12 @@
 //  IncomeEditorView.swift
 //  PaycheckPlanner
 //
-//  Created by Rob on 8/24/25.
-//  Updated on 9/2/25 – Amount editor clears on focus & auto-commits on blur/other-control; safe schedule bindings; Delete button
+//  Updated on 9/3/25 – iOS 17-safe focus change handling (no deprecated onChange),
+//                       amount clears on focus & commits on blur/other-control.
+//                       Delete confirmation preserved.
+//  Updated on 9/3/25 (fix): Switch to local DRAFT editing (no live mutations).
+//                           Cancel truly discards edits; Save applies to SwiftData.
 //
-
 import SwiftUI
 import SwiftData
 
@@ -29,24 +31,47 @@ private func parseDecimal(from s: String) -> Decimal {
     return Decimal(string: dec) ?? 0
 }
 
+// MARK: - Draft models (local-only, not persisted)
+
+private struct DraftSchedule {
+    var hasSchedule: Bool
+    var frequency: PayFrequency
+    var anchorDate: Date
+    var firstDay: Int
+    var secondDay: Int
+}
+
 struct IncomeEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
-    // Bind to the SwiftData model that was passed in.
-    @Bindable var source: IncomeSource
+    // We read from this model and write back ONLY on Save.
+    let source: IncomeSource
 
-    // Text editing state for currency field
-    @State private var amountText: String = ""
+    // MARK: - Draft state (no live mutations)
+    @State private var draftName: String = ""
+    @State private var draftVariable: Bool = false
+
+    // Currency field uses a string for editing UX; we keep both text + parsed number.
+    @State private var draftAmountText: String = ""
+    @State private var draftAmount: Decimal = 0
     @FocusState private var amountFocused: Bool
 
+    @State private var draftSchedule = DraftSchedule(
+        hasSchedule: false,
+        frequency: .biweekly,
+        anchorDate: Date(),
+        firstDay: 1,
+        secondDay: 15
+    )
+
+    // UI
     @State private var showDeleteConfirm = false
 
     // MARK: - Init
 
     init(existing: IncomeSource) {
-        self._source = Bindable(existing)
-        // amountText is set in .onAppear so we can decide to show "" when value is 0
+        self.source = existing
     }
 
     // MARK: - View
@@ -54,90 +79,56 @@ struct IncomeEditorView: View {
     var body: some View {
         Form {
             Section("Details") {
-                TextField("Name", text: $source.name)
+                TextField("Name", text: $draftName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
 
                 // Currency editor (String-backed)
-                TextField("Default amount", text: $amountText, prompt: Text("$0.00"))
+                TextField("Default amount", text: $draftAmountText, prompt: Text("$0.00"))
                     .keyboardType(.decimalPad)
                     .focused($amountFocused)
-                    .onChange(of: amountFocused) { focused in
+                    .submitLabel(.done)
+                    .onFocusChangeCompat($amountFocused) { _, focused in
                         if focused {
-                            // Clear placeholder for clean entry when focusing an empty/zero value
-                            if source.defaultAmount == 0, amountText.isEmpty || amountText == ppFormatCurrency(0) {
-                                amountText = ""
+                            // Clear placeholder when focusing an empty/zero value
+                            if draftAmount == 0,
+                               draftAmountText.isEmpty || draftAmountText == ppFormatCurrency(0) {
+                                draftAmountText = ""
                             }
                         } else {
-                            commitAmount() // auto-confirm as soon as focus leaves
+                            commitAmount() // auto-commit on blur
                         }
                     }
-                    .onSubmit { commitAmount() } // in case a keyboard “Done” is present
+                    .onSubmit { commitAmount() }
 
-                Toggle("Variable amount", isOn: $source.variable)
+                Toggle("Variable amount", isOn: $draftVariable)
                     .onTapGesture { amountFocused = false } // finalize before toggling
             }
 
             Section("Schedule") {
-                // Ensure a schedule exists, then build safe explicit bindings (no force unwraps)
-                let sched = ensureSchedule()
-
-                let freqBinding = Binding<PayFrequency>(
-                    get: { sched.frequency },
-                    set: { new in
-                        commitFromOtherControl()
-                        sched.frequency = new
-                        source.schedule = sched
-                    }
-                )
-
-                let dateBinding = Binding<Date>(
-                    get: { sched.anchorDate },
-                    set: { new in
-                        commitFromOtherControl()
-                        sched.anchorDate = new
-                        source.schedule = sched
-                    }
-                )
-
-                let firstDayBinding = Binding<Int>(
-                    get: { sched.semimonthlyFirstDay },
-                    set: { new in
-                        commitFromOtherControl()
-                        sched.semimonthlyFirstDay = new
-                        source.schedule = sched
-                    }
-                )
-
-                let secondDayBinding = Binding<Int>(
-                    get: { sched.semimonthlySecondDay },
-                    set: { new in
-                        commitFromOtherControl()
-                        sched.semimonthlySecondDay = new
-                        source.schedule = sched
-                    }
-                )
-
-                Picker("Frequency", selection: freqBinding) {
+                // Frequency
+                Picker("Frequency", selection: $draftSchedule.frequency) {
                     Text("One-time").tag(PayFrequency.once)
                     Text("Weekly").tag(PayFrequency.weekly)
                     Text("Bi-weekly").tag(PayFrequency.biweekly)
                     Text("Semi-monthly").tag(PayFrequency.semimonthly)
                     Text("Monthly").tag(PayFrequency.monthly)
                 }
-                .onTapGesture { amountFocused = false } // commit amount before interacting
+                .onTapGesture { amountFocused = false }
 
-                DatePicker("Starts", selection: dateBinding, displayedComponents: .date)
+                // Start date
+                DatePicker("Starts", selection: $draftSchedule.anchorDate, displayedComponents: .date)
                     .onTapGesture { amountFocused = false }
 
-                if sched.frequency == .semimonthly {
-                    Stepper(value: firstDayBinding, in: 1...28) {
-                        Text("First day: \(sched.semimonthlyFirstDay)")
+                // Semi-monthly details when applicable
+                if draftSchedule.frequency == .semimonthly {
+                    Stepper(value: $draftSchedule.firstDay, in: 1...28) {
+                        Text("First day: \(draftSchedule.firstDay)")
                     }
                     .onTapGesture { amountFocused = false }
 
-                    Stepper(value: secondDayBinding, in: 1...28) {
-                        Text("Second day: \(sched.semimonthlySecondDay)")
+                    Stepper(value: $draftSchedule.secondDay, in: 1...28) {
+                        Text("Second day: \(draftSchedule.secondDay)")
                     }
                     .onTapGesture { amountFocused = false }
                 }
@@ -152,23 +143,30 @@ struct IncomeEditorView: View {
                 }
             }
         }
-        .navigationTitle(source.name.isEmpty ? "Income" : source.name)
+        .navigationTitle(draftName.isEmpty ? "Income" : draftName)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            // Seed the editor string. If zero, start blank so placeholder shows and clears on focus.
-            if source.defaultAmount == 0 {
-                amountText = ""
-            } else {
-                amountText = ppFormatCurrency(source.defaultAmount)
-            }
-            _ = ensureSchedule()
-        }
+        .onAppear(perform: loadDraft)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") {
-                    amountFocused = false // commit then close
+            ToolbarItem(placement: .topBarLeading) {
+                Button("Cancel") {
+                    amountFocused = false
+                    // No writes to model: drafts are discarded.
                     dismiss()
                 }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") {
+                    amountFocused = false
+                    commitAmount()
+                    applyDraftAndSave()
+                    dismiss()
+                }
+                .bold()
+                .disabled(!isValid)
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") { amountFocused = false }
             }
         }
         .alert("Delete this income?", isPresented: $showDeleteConfirm) {
@@ -179,35 +177,77 @@ struct IncomeEditorView: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Validation
 
-    /// Confirm/commit the `amountText` into `source.defaultAmount`, and reformat the field.
-    private func commitAmount() {
-        let newValue = parseDecimal(from: amountText)
-        source.defaultAmount = newValue
-        // Show formatted currency unless zero (let placeholder remain visually)
-        if newValue == 0 {
-            amountText = ""
+    private var isValid: Bool {
+        !draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && draftAmount > 0
+    }
+
+    // MARK: - Draft lifecycle
+
+    private func loadDraft() {
+        draftName = source.name
+        draftVariable = source.variable
+        draftAmount = source.defaultAmount
+        draftAmountText = (draftAmount == 0) ? "" : ppFormatCurrency(draftAmount)
+
+        if let s = source.schedule {
+            draftSchedule = DraftSchedule(
+                hasSchedule: true,
+                frequency: s.frequency,
+                anchorDate: s.anchorDate,
+                firstDay: s.semimonthlyFirstDay,
+                secondDay: s.semimonthlySecondDay
+            )
         } else {
-            amountText = ppFormatCurrency(newValue)
+            draftSchedule = DraftSchedule(
+                hasSchedule: false,
+                frequency: .biweekly,
+                anchorDate: Date(),
+                firstDay: 1,
+                secondDay: 15
+            )
         }
     }
 
-    /// Treat changing other controls as "Done" for the amount field.
-    private func commitFromOtherControl() {
-        if amountFocused { amountFocused = false }
-        commitAmount()
+    // MARK: - Actions
+
+    /// Confirm/commit the `draftAmountText` into `draftAmount`, and reformat the field.
+    private func commitAmount() {
+        let newValue = parseDecimal(from: draftAmountText)
+        draftAmount = newValue
+        draftAmountText = (newValue == 0) ? "" : ppFormatCurrency(newValue)
     }
 
-    /// Guarantee a schedule exists so bindings are safe.
-    @discardableResult
-    private func ensureSchedule() -> IncomeSchedule {
-        if let s = source.schedule {
-            return s
+    /// Apply draft values to the SwiftData model and save.
+    private func applyDraftAndSave() {
+        source.name = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
+        source.variable = draftVariable
+        source.defaultAmount = draftAmount
+
+        // Schedule: create or update the model object to match the draft
+        if let sched = source.schedule {
+            // Update existing schedule
+            sched.frequency = draftSchedule.frequency
+            sched.anchorDate = draftSchedule.anchorDate
+            sched.semimonthlyFirstDay = draftSchedule.firstDay
+            sched.semimonthlySecondDay = draftSchedule.secondDay
         } else {
-            let s = IncomeSchedule(source: source, frequency: .biweekly, anchorDate: Date())
+            // Create if not present (we always show schedule UI)
+            let s = IncomeSchedule(
+                source: source,
+                frequency: draftSchedule.frequency,
+                anchorDate: draftSchedule.anchorDate
+            )
+            s.semimonthlyFirstDay = draftSchedule.firstDay
+            s.semimonthlySecondDay = draftSchedule.secondDay
             source.schedule = s
-            return s
+        }
+
+        do { try context.save() } catch {
+            // Non-fatal: you can surface an error UI if you prefer
+            // For now, silently fail to keep UX smooth.
         }
     }
 
@@ -216,6 +256,36 @@ struct IncomeEditorView: View {
         context.delete(source)
         do { try context.save() } catch { /* non-fatal */ }
         dismiss()
+    }
+}
+
+// MARK: - iOS 17 focus-change compatibility (Bool FocusState)
+
+private struct FocusChangeCompatModifier: ViewModifier {
+    var focused: FocusState<Bool>.Binding
+    let action: (_ old: Bool, _ new: Bool) -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.onChange(of: focused.wrappedValue) { oldValue, newValue in
+                action(oldValue, newValue)
+            }
+        } else {
+            content.onChange(of: focused.wrappedValue) { newValue in
+                action(focused.wrappedValue, newValue)
+            }
+        }
+    }
+}
+
+private extension View {
+    /// Use this for FocusState<Bool>.Binding to avoid the deprecated one-parameter onChange
+    /// and compiler crashes that sometimes occur with projectedValue generics.
+    func onFocusChangeCompat(
+        _ focused: FocusState<Bool>.Binding,
+        perform: @escaping (_ old: Bool, _ new: Bool) -> Void
+    ) -> some View {
+        modifier(FocusChangeCompatModifier(focused: focused, action: perform))
     }
 }
 
