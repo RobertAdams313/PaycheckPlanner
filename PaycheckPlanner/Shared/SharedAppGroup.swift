@@ -12,7 +12,8 @@ import Foundation
 
 enum SharedAppGroup {
     /// e.g. "group.com.yourcompany.paycheckplanner"
-    static let identifier: String? = nil
+    static let identifier: String? = "group.com.RobAdams.PaycheckPlanner"
+
 
     static var defaults: UserDefaults {
         if let id = identifier, let ud = UserDefaults(suiteName: id) { return ud }

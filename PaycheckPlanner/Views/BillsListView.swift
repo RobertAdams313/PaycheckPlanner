@@ -1,61 +1,31 @@
-//
 //  BillsListView.swift
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
-//
-
-
-//
-//  BillsListView.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 8/24/25.
-//  © 2025 Rob Adams. All rights reserved.
-//
-
-//
-//  BillsListView.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 9/1/25.
 //
 
 import SwiftUI
 import SwiftData
 
-// MARK: - Bills List
-
 struct BillsListView: View {
     @Environment(\.modelContext) private var context
 
-    // Your Bill model is already SwiftData-backed. We sort by the computed `anchorDueDate` you added.
     @Query(sort: \Bill.anchorDueDate, order: .forward)
     private var bills: [Bill]
 
+    @Query private var payments: [BillPayment]
+
     private let cal = Calendar.current
 
-    // Build the “date buckets” using the new DateSpan type
     private var buckets: [DueBucket] {
         let todayStart = cal.startOfDay(for: Date())
-
         let overdueEnd = cal.date(byAdding: .day, value: -1, to: todayStart)
         let next7End = cal.date(byAdding: .day, value: 7, to: todayStart)
 
         return [
-            // Overdue: anything strictly before today
-            DueBucket(title: "Overdue",
-                      span: DateSpan(start: .distantPast, end: overdueEnd)),
-
-            // Next 7 Days: [today ... today+7]
-            DueBucket(title: "Next 7 Days",
-                      span: DateSpan(start: todayStart, end: next7End)),
-
-            // Later: after the next 7 days (open-ended)
-            DueBucket(title: "Later",
-                      span: DateSpan(start: cal.date(byAdding: .day, value: 8, to: todayStart) ?? todayStart,
-                                     end: nil))
+            DueBucket(title: "Overdue", span: DateSpan(start: .distantPast, end: overdueEnd)),
+            DueBucket(title: "Next 7 Days", span: DateSpan(start: todayStart, end: next7End)),
+            DueBucket(title: "Later", span: DateSpan(start: cal.date(byAdding: .day, value: 8, to: todayStart) ?? todayStart, end: nil))
         ]
     }
 
@@ -72,11 +42,11 @@ struct BillsListView: View {
                     List {
                         ForEach(buckets) { bucket in
                             let bucketed = billsIn(bucket: bucket)
-
                             if !bucketed.isEmpty {
                                 Section(bucket.title) {
                                     ForEach(bucketed) { bill in
-                                        BillRow(bill: bill)
+                                        BillRow(bill: bill, isPaid: isPaid(bill))
+                                            .billPaidSwipe(bill: bill, periodKey: periodKey(for: bill))
                                     }
                                 }
                             }
@@ -88,7 +58,15 @@ struct BillsListView: View {
         }
     }
 
-    // MARK: - Helpers
+    private func periodKey(for bill: Bill) -> Date {
+        cal.startOfDay(for: bill.anchorDueDate)
+    }
+
+    private func isPaid(_ bill: Bill) -> Bool {
+        let pk = periodKey(for: bill)
+        let id = bill.persistentModelID
+        return payments.contains { $0.bill?.persistentModelID == id && $0.periodKey == pk }
+    }
 
     private func billsIn(bucket: DueBucket) -> [Bill] {
         bills.filter { b in
@@ -101,6 +79,7 @@ struct BillsListView: View {
 
 private struct BillRow: View {
     let bill: Bill
+    let isPaid: Bool
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -115,22 +94,25 @@ private struct BillRow: View {
 
                     Text(dateString(bill.anchorDueDate))
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.tertiary) // ✅ ShapeStyle
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 12)
 
             Text(currency(bill.amount))
                 .monospacedDigit()
                 .font(.body.weight(.semibold))
+
+            Image(systemName: isPaid ? "checkmark.circle.fill" : "circle")
+                .imageScale(.large)
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.tertiary) // ✅ ShapeStyle
+                .padding(.leading, 8)
+                .accessibilityHidden(true)
         }
         .contentShape(Rectangle())
-        // (Optional) Tap action to push a detail if you have one:
-        // .onTapGesture { /* navigate to Bill detail */ }
     }
-
-    // Currency and date formatters kept local for clarity
 
     private func currency(_ d: Decimal) -> String {
         let n = NSDecimalNumber(decimal: d)
