@@ -4,57 +4,109 @@
 //
 //  Created by Rob on 8/24/25.
 //  Updated on 9/2/25 – Card UI parity with PlanView; grouping toggle; fixes init label `existingBill:`
-//  Updated on 9/3/25 – Adds HIG-compliant swipe-to-delete with confirmation alert (without removing existing features)
+//  Updated on 9/4/25 – Mark-as-Paid per occurrence (long press), animated checkmark; compiles without external Haptics binding.
 //
 
 import SwiftUI
 import SwiftData
-
-// MARK: - Utilities
-
-/// Distinct name to avoid clashing with any global currency helpers.
-private func ppCurrency(_ d: Decimal) -> String {
-    let n = NSDecimalNumber(decimal: d)
-    let f = NumberFormatter()
-    f.numberStyle = .currency
-    f.maximumFractionDigits = 2
-    f.minimumFractionDigits = 2
-    return f.string(from: n) ?? "$0.00"
-}
-
-private func dueSubtitle(_ date: Date) -> String {
-    let cal = Calendar.current
-    if cal.isDateInToday(date) { return "Due Today" }
-    if cal.isDateInTomorrow(date) { return "Due Tomorrow" }
-    if cal.isDateInYesterday(date) { return "Due Yesterday" }
-    let f = DateFormatter()
-    f.dateStyle = .medium
-    f.timeStyle = .none
-    return "Due \(f.string(from: date))"
-}
-
-// MARK: - Grouping
-
-private enum BillsGrouping: String, CaseIterable, Identifiable {
-    case dueDate = "Due Date"
-    case category = "Category"
-    var id: String { rawValue }
-}
-
-// MARK: - View
+import UIKit   // for UINotificationFeedbackGenerator
 
 struct BillsView: View {
     @Environment(\.modelContext) private var context
 
+    // MARK: - Utilities
+
+    /// Distinct name to avoid clashing with any global currency helpers.
+    private func ppCurrency(_ d: Decimal) -> String {
+        let n = NSDecimalNumber(decimal: d)
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.maximumFractionDigits = 2
+        f.minimumFractionDigits = 2
+        return f.string(from: n) ?? "$0.00"
+    }
+
+    private func dueLabel(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Due Today" }
+        if cal.isDateInTomorrow(date) { return "Due Tomorrow" }
+        if cal.isDateInYesterday(date) { return "Due Yesterday" }
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return "Due \(f.string(from: date))"
+    }
+
+    // MARK: - Local haptic (fallback if shared Haptics isn’t visible here)
+
+    private func hapticSuccess() {
+        let gen = UINotificationFeedbackGenerator()
+        gen.prepare()
+        gen.notificationOccurred(.success)
+    }
+
+    // MARK: - Shared Card Style
+
+    private struct FrostCard<Content: View>: View {
+        @ViewBuilder var content: Content
+        var body: some View {
+            content
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+        }
+    }
+
+    // MARK: - Grouping
+
+    private enum BillsGrouping: String, CaseIterable, Identifiable {
+        case dueDate = "Due Date"
+        case category = "Category"
+        var id: String { rawValue }
+    }
+
+    // MARK: - SwiftData
+
     @Query(sort: \Bill.anchorDueDate, order: .forward)
     private var allBills: [Bill]
 
-    @State private var grouping: BillsGrouping = .dueDate
+    // MARK: - State
+
+    @AppStorage("billsGrouping") private var groupingRaw: String = BillsGrouping.dueDate.rawValue
+    private var grouping: BillsGrouping {
+        get { BillsGrouping(rawValue: groupingRaw) ?? .dueDate }
+        set { groupingRaw = newValue.rawValue }
+    }
+    /// Binding for Picker (fixes “Generic parameter ‘SelectionValue’ could not be inferred” and “Cannot find $grouping”)
+    private var groupingBinding: Binding<BillsGrouping> {
+        Binding(
+            get: { BillsGrouping(rawValue: groupingRaw) ?? .dueDate },
+            set: { groupingRaw = $0.rawValue }
+        )
+    }
+
+    @State private var showingAdd = false
     @State private var draftNewBill: Bill?
 
-    // Delete confirmation state (HIG)
-    @State private var pendingDeleteBill: Bill?
-    @State private var showDeleteBillAlert = false
+    // MARK: - Paid State (per-bill occurrence keyed by anchorDueDate)
+    private func periodKey(for bill: Bill) -> Date {
+        Calendar.current.startOfDay(for: bill.anchorDueDate)
+    }
+    private func isPaid(_ bill: Bill) -> Bool {
+        MarkAsPaidService.isPaid(bill, periodKey: periodKey(for: bill), in: context)
+    }
+    @MainActor
+    private func togglePaid(_ bill: Bill) {
+        withAnimation(.snappy) {
+            _ = MarkAsPaidService.togglePaid(bill, periodKey: periodKey(for: bill), in: context)
+        }
+    }
 
     // MARK: - Time buckets
 
@@ -84,34 +136,45 @@ struct BillsView: View {
     private var nextWeek: [Bill] {
         let cal = Calendar.current
         let now = Date()
-        let thisWeekInterval = cal.dateInterval(of: .weekOfYear, for: now) ?? DateInterval(start: now, end: now)
-        guard let nextWeekStart = cal.date(byAdding: .weekOfYear, value: 1, to: thisWeekInterval.start),
-              let nextWeekInterval = cal.dateInterval(of: .weekOfYear, for: nextWeekStart)
-        else { return [] }
+        let thisWeekEnd = (cal.dateInterval(of: .weekOfYear, for: now) ?? DateInterval(start: now, end: now)).end
+        let nextWeekEnd = (cal.date(byAdding: .weekOfYear, value: 1, to: thisWeekEnd)) ?? thisWeekEnd
         return allBills.filter { b in
-            b.anchorDueDate >= nextWeekInterval.start && b.anchorDueDate < nextWeekInterval.end
+            b.anchorDueDate >= thisWeekEnd && b.anchorDueDate < nextWeekEnd
         }
     }
 
     private var later: [Bill] {
         let cal = Calendar.current
         let now = Date()
-        let thisWeekInterval = cal.dateInterval(of: .weekOfYear, for: now) ?? DateInterval(start: now, end: now)
-        guard let nextWeekStart = cal.date(byAdding: .weekOfYear, value: 1, to: thisWeekInterval.start),
-              let nextWeekInterval = cal.dateInterval(of: .weekOfYear, for: nextWeekStart)
-        else { return [] }
-        return allBills.filter { b in b.anchorDueDate >= nextWeekInterval.end }
+        let nextWeekEnd = (cal.date(byAdding: .weekOfYear, value: 2, to: (cal.dateInterval(of: .weekOfYear, for: now) ?? DateInterval(start: now, end: now)).end)) ?? now
+        return allBills.filter { $0.anchorDueDate >= nextWeekEnd }
     }
 
-    // MARK: - Category grouping
+    private var groupedByCategory: [Dictionary<String, [Bill]>.Element] {
+        let groups = Dictionary(grouping: allBills) { $0.category.isEmpty ? "Uncategorized" : $0.category }
+        return groups.sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+    }
 
-    private var groupedByCategory: [(key: String, value: [Bill])] {
-        let dict = Dictionary(grouping: allBills, by: { $0.category.isEmpty ? "Uncategorized" : $0.category })
-        return dict
-            .map { (key: $0.key, value: $0.value.sorted(by: { $0.anchorDueDate < $1.anchorDueDate })) }
-            .sorted {
-                ($0.value.first?.anchorDueDate ?? .distantFuture) < ($1.value.first?.anchorDueDate ?? .distantFuture)
+    // MARK: - Header
+
+    private var headerBar: some View {
+        HStack(spacing: 12) {
+            Text("Your Bills")
+                .font(.title2.weight(.bold))
+            Spacer()
+            Button {
+                hapticSuccess()
+                showingAdd = true
+            } label: {
+                Label("Add", systemImage: "plus.circle.fill")
+                    .labelStyle(.iconOnly)
+                    .imageScale(.large)
             }
+            .buttonStyle(.plain)
+            .sheet(isPresented: $showingAdd) {
+                AddOrEditBillView(existingBill: nil)
+            }
+        }
     }
 
     // MARK: - Body
@@ -133,7 +196,7 @@ struct BillsView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Picker("Group by", selection: $grouping) {
+                    Picker("Group by", selection: groupingBinding) {
                         ForEach(BillsGrouping.allCases) { Text($0.rawValue).tag($0) }
                     }
                 } label: {
@@ -141,58 +204,14 @@ struct BillsView: View {
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { addBill() } label: {
+                NavigationLink(value: Bill?.none) {
                     Label("Add Bill", systemImage: "plus")
                 }
             }
         }
-        // IMPORTANT: Your BillEditorView requires `existingBill:` label.
-        .navigationDestination(for: Bill.self) { bill in
-            BillEditorView(existingBill: bill)
+        .navigationDestination(for: Bill?.self) { bill in
+            AddOrEditBillView(existingBill: bill)
         }
-        .sheet(item: $draftNewBill) { newBill in
-            NavigationStack {
-                BillEditorView(existingBill: newBill)
-            }
-        }
-        // HIG: destructive alert with clear Cancel
-        .alert(
-            Text("Delete Bill"),
-            isPresented: $showDeleteBillAlert,
-            presenting: pendingDeleteBill
-        ) { bill in
-            Button("Delete", role: .destructive) {
-                withAnimation {
-                    context.delete(bill)
-                    do { try context.save() } catch {
-                        // Optionally surface error UI
-                    }
-                }
-                pendingDeleteBill = nil
-            }
-            Button("Cancel", role: .cancel) {
-                pendingDeleteBill = nil
-            }
-        } message: { bill in
-            Text("“\(bill.name.isEmpty ? "Untitled Bill" : bill.name)” will be removed from your plan.")
-        }
-    }
-
-    // MARK: - Sections
-
-    @ViewBuilder
-    private var headerBar: some View {
-        HStack {
-            Text("Your bills")
-                .font(.headline)
-                .foregroundStyle(.primary)
-            Spacer()
-            Text("\(allBills.count)")
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Total bills")
-        }
-        .padding(.horizontal, 2)
     }
 
     @ViewBuilder
@@ -230,23 +249,21 @@ struct BillsView: View {
                 ForEach(bills) { bill in
                     NavigationLink(value: bill) {
                         FrostCard {
-                            HStack(alignment: .firstTextBaseline) {
-                                VStack(alignment: .leading, spacing: 2) {
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     Text(bill.name.isEmpty ? "Untitled Bill" : bill.name)
-                                        .font(.body.weight(.semibold))
+                                        .font(.headline)
                                         .foregroundStyle(.primary)
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
 
                                     HStack(spacing: 8) {
-                                        Text(dueSubtitle(bill.anchorDueDate))
+                                        Text(dueLabel(bill.anchorDueDate))
+                                            .font(.footnote)
                                             .foregroundStyle(.secondary)
-                                            .font(.caption)
 
                                         if !bill.category.isEmpty {
                                             Text(bill.category)
-                                                .font(.caption2.weight(.semibold))
-                                                .padding(.horizontal, 6)
+                                                .font(.footnote.weight(.semibold))
+                                                .padding(.horizontal, 8)
                                                 .padding(.vertical, 2)
                                                 .background(
                                                     Capsule(style: .continuous)
@@ -263,24 +280,26 @@ struct BillsView: View {
 
                                 Spacer(minLength: 8)
 
-                                Text(ppCurrency(bill.amount))
-                                    .font(.headline.monospacedDigit())
-                                    .foregroundStyle(.primary)
-                                    .accessibilityLabel("Amount \(ppCurrency(bill.amount))")
+                                HStack(spacing: 8) {
+                                    if isPaid(bill) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .imageScale(.large)
+                                            .symbolRenderingMode(.hierarchical)
+                                            .transition(.scale.combined(with: .opacity))
+                                    }
+                                    Text(ppCurrency(bill.amount))
+                                        .font(.headline.monospacedDigit())
+                                        .foregroundStyle(.primary)
+                                }
                             }
                         }
                     }
                     .buttonStyle(.plain)
-                    // NEW: Swipe-to-delete with confirmation
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            pendingDeleteBill = bill
-                            showDeleteBillAlert = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .accessibilityLabel("Delete bill")
-                    }
+                    // Long press anywhere on the row to toggle "Paid" for this occurrence
+                    .simultaneousGesture(LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                        hapticSuccess()
+                        togglePaid(bill)
+                    })
                 }
             }
         }
@@ -289,36 +308,12 @@ struct BillsView: View {
 
     // MARK: - Empty State
 
-    @ViewBuilder
     private var emptyState: some View {
-        FrostCard {
-            VStack(spacing: 8) {
-                Image(systemName: "tray")
-                    .imageScale(.large)
-                Text("No bills to show")
-                    .font(.headline)
-                Text("Tap + to add your first bill.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .multilineTextAlignment(.center)
-        }
-        .padding(.top, 8)
-    }
-
-    // MARK: - Actions
-
-    private func addBill() {
-        // Memberwise order per your model: name, amount, anchorDueDate, category
-        let new = Bill(
-            name: "",
-            amount: 0,
-            anchorDueDate: Date(),
-            category: ""
+        ContentUnavailableView(
+            "No bills yet",
+            systemImage: "list.bullet.rectangle",
+            description: Text("Add a bill to see them organized by due date.")
         )
-        context.insert(new)
-        draftNewBill = new
     }
 }
 

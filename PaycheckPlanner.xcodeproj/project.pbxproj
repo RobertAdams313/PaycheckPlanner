@@ -61,6 +61,11 @@
 		D4727BDE2E692F0B00FA758C /* DataSnapshotBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BDD2E692F0B00FA758C /* DataSnapshotBackup.swift */; };
 		D4727BE22E6944B700FA758C /* DataManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BE12E6944B700FA758C /* DataManagementView.swift */; };
 		D4727BE32E69491C00FA758C /* NotificationsBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BD52E6925DE00FA758C /* NotificationsBootstrap.swift */; };
+		D4727BE72E696BA300FA758C /* BillPaidSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BE62E696BA300FA758C /* BillPaidSwipe.swift */; };
+		D4727BF02E696C9F00FA758C /* BillPaidHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BEA2E696BD000FA758C /* BillPaidHelpers.swift */; };
+		D4727BF32E697A0B00FA758C /* PaycheckDetailViewCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BF12E69796500FA758C /* PaycheckDetailViewCompat.swift */; };
+		D4727BF52E69818700FA758C /* MarkAsPaidService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BF42E69818700FA758C /* MarkAsPaidService.swift */; };
+		D4727BF92E6986E600FA758C /* BillPayment.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4727BEC2E696C0300FA758C /* BillPayment.swift */; };
 		D4A4B1512E65C22600E62BF3 /* CategoryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1502E65C22600E62BF3 /* CategoryPicker.swift */; };
 		D4A4B1532E65C29900E62BF3 /* PreviousPeriodsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1522E65C29900E62BF3 /* PreviousPeriodsView.swift */; };
 		D4A4B1552E65C95F00E62BF3 /* DateSpan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */; };
@@ -141,6 +146,12 @@
 		D4727BD62E6925DE00FA758C /* NotificationsCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsCoordinator.swift; sourceTree = "<group>"; };
 		D4727BDD2E692F0B00FA758C /* DataSnapshotBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSnapshotBackup.swift; sourceTree = "<group>"; };
 		D4727BE12E6944B700FA758C /* DataManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataManagementView.swift; sourceTree = "<group>"; };
+		D4727BE62E696BA300FA758C /* BillPaidSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillPaidSwipe.swift; sourceTree = "<group>"; };
+		D4727BEA2E696BD000FA758C /* BillPaidHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillPaidHelpers.swift; sourceTree = "<group>"; };
+		D4727BEC2E696C0300FA758C /* BillPayment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillPayment.swift; sourceTree = "<group>"; };
+		D4727BF12E69796500FA758C /* PaycheckDetailViewCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaycheckDetailViewCompat.swift; sourceTree = "<group>"; };
+		D4727BF42E69818700FA758C /* MarkAsPaidService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkAsPaidService.swift; sourceTree = "<group>"; };
+		D4727BF82E69861E00FA758C /* BillPayCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillPayCompat.swift; sourceTree = "<group>"; };
 		D4A4B1502E65C22600E62BF3 /* CategoryPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryPicker.swift; sourceTree = "<group>"; };
 		D4A4B1522E65C29900E62BF3 /* PreviousPeriodsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviousPeriodsView.swift; sourceTree = "<group>"; };
 		D4A4B1542E65C95F00E62BF3 /* DateSpan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateSpan.swift; sourceTree = "<group>"; };
@@ -221,6 +232,8 @@
 		AA4E55A826E5809B3B1B0FAC /* PaycheckPlanner */ = {
 			isa = PBXGroup;
 			children = (
+				D4727BEC2E696C0300FA758C /* BillPayment.swift */,
+				D4727BEA2E696BD000FA758C /* BillPaidHelpers.swift */,
 				D4727BDD2E692F0B00FA758C /* DataSnapshotBackup.swift */,
 				D4C92E692E676011000AC97A /* MoneyRounding.swift */,
 				D447D5D02E5B798900710C67 /* AppRouter.swift */,
@@ -313,6 +326,7 @@
 		D4C92E6C2E676C33000AC97A /* MarkasPaid */ = {
 			isa = PBXGroup;
 			children = (
+				D4727BF82E69861E00FA758C /* BillPayCompat.swift */,
 			);
 			path = MarkasPaid;
 			sourceTree = "<group>";
@@ -320,6 +334,9 @@
 		D8DEB7A5B4B2722C93D8EA84 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				D4727BF42E69818700FA758C /* MarkAsPaidService.swift */,
+				D4727BF12E69796500FA758C /* PaycheckDetailViewCompat.swift */,
+				D4727BE62E696BA300FA758C /* BillPaidSwipe.swift */,
 				30EF32F12E5B3E420009E58B /* AppBootstrapView.swift */,
 				D447D59D2E5B600400710C67 /* BillEditorView.swift */,
 				D447D5C62E5B75FA00710C67 /* BillsListView.swift */,
@@ -507,6 +524,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D4727BF02E696C9F00FA758C /* BillPaidHelpers.swift in Sources */,
 				D4727BDB2E69260600FA758C /* NotificationManager.swift in Sources */,
 				D4727BD22E69259E00FA758C /* CSVKit.swift in Sources */,
 				D4C92E752E676E65000AC97A /* MoneyRounding.swift in Sources */,
@@ -539,6 +557,7 @@
 				D4727BDE2E692F0B00FA758C /* DataSnapshotBackup.swift in Sources */,
 				30EF32FA2E5B409F0009E58B /* LaunchScreen.storyboard in Sources */,
 				D4727BCB2E691E7000FA758C /* DataCSVExporter.swift in Sources */,
+				D4727BF32E697A0B00FA758C /* PaycheckDetailViewCompat.swift in Sources */,
 				D4727BCC2E691E7000FA758C /* BackupManager.swift in Sources */,
 				30EF32B12E5A73790009E58B /* ExportMenu.swift in Sources */,
 				D447D5972E5B5CA700710C67 /* PlanView.swift in Sources */,
@@ -558,7 +577,9 @@
 				D447D5C72E5B75FA00710C67 /* BillsListView.swift in Sources */,
 				3050D29B2E59FD60007416C0 /* SetupView.swift in Sources */,
 				D4727BD72E6925DE00FA758C /* NotificationDeepLinkModel.swift in Sources */,
+				D4727BE72E696BA300FA758C /* BillPaidSwipe.swift in Sources */,
 				D4727BD92E6925DE00FA758C /* NotificationsCoordinator.swift in Sources */,
+				D4727BF52E69818700FA758C /* MarkAsPaidService.swift in Sources */,
 				D4727BE32E69491C00FA758C /* NotificationsBootstrap.swift in Sources */,
 				D447D5CF2E5B77A300710C67 /* InsightsHostView.swift in Sources */,
 				D4A4B1512E65C22600E62BF3 /* CategoryPicker.swift in Sources */,
@@ -567,6 +588,7 @@
 				D447D5B62E5B6C5D00710C67 /* CombinedPayEventsEngine.swift in Sources */,
 				30EF32F42E5B3EE50009E58B /* SettingsView.swift in Sources */,
 				30EF32F22E5B3E420009E58B /* AppBootstrapView.swift in Sources */,
+				D4727BF92E6986E600FA758C /* BillPayment.swift in Sources */,
 				C4B1A4CBA7E008C0751E79D8 /* Shared.swift in Sources */,
 				30EF33012E5B4CCD0009E58B /* SettingsHostView.swift in Sources */,
 			);

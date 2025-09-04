@@ -2,382 +2,383 @@
 //  PaycheckDetailView.swift
 //  PaycheckPlanner
 //
-//  Created by Rob on 8/24/25.
-//  Updated on 9/2/25
+//  Restored “classic” layout (screenshot style) with Card-like sections.
+//  Uses current engine types (CombinedPeriod, CombinedBreakdown, AllocatedBillLine).
+//
+//  Swap-in CardKit: replace `.ppCard()` with your CardKit modifier.
 //
 
 import SwiftUI
 import SwiftData
 
-// MARK: - Lightweight value rows (avoid Binding/bridging confusion)
+// MARK: - Helpers
 
-private struct IncomeRowData: Identifiable {
-    let id: UUID
-    let name: String
-    let paidDate: Date
-    let amount: Decimal
+private func sod(_ d: Date) -> Date { Calendar.current.startOfDay(for: d) }
+
+private func currency(_ d: Decimal) -> String {
+    let n = NSDecimalNumber(decimal: d)
+    let f = NumberFormatter()
+    f.numberStyle = .currency
+    f.maximumFractionDigits = 2
+    f.minimumFractionDigits = 2
+    f.locale = .current
+    return f.string(from: n) ?? "$0.00"
 }
 
-private struct BillRowData: Identifiable {
-    let id: UUID
-    let title: String
-    let category: String?
-    let dueDates: [Date]     // all due dates inside the period [start, end)
-    let amountEach: Decimal
-    let occurrences: Int
-    let total: Decimal
+private func dateMedium(_ date: Date) -> String {
+    let f = DateFormatter()
+    f.dateStyle = .medium
+    f.timeStyle = .none
+    return f.string(from: date)
 }
 
-// MARK: - Shared card container (matches PlanView)
+private func dateShortDay(_ date: Date) -> String {
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    return f.string(from: date)
+}
 
-private struct CardRow<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content
-                .padding(14)
-        }
-        .frame(maxWidth: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(.separator.opacity(0.15))
-                )
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .padding(.horizontal)
-        .padding(.vertical, 6)
+private func frequencyLabel(_ freq: PayFrequency) -> String {
+    switch freq {
+    case .once:         return "One-time"
+    case .weekly:       return "Weekly"
+    case .biweekly:     return "Biweekly"
+    case .semimonthly:  return "Semi-monthly"
+    case .monthly:      return "Monthly"
     }
 }
 
 // MARK: - View
 
-/// Shows full details for a single combined period: income, bills, and remaining.
 struct PaycheckDetailView: View {
+    let payday: Date
+
     @Environment(\.modelContext) private var context
-    let breakdown: CombinedBreakdown
+    @Query(sort: \IncomeSchedule.anchorDate, order: .forward) private var schedules: [IncomeSchedule]
+    @Query(sort: \Bill.anchorDueDate, order: .forward) private var bills: [Bill]
+
+    private var breakdown: CombinedBreakdown? {
+        // Build starting 1 day before to avoid a [payday, payday] zero-length segment.
+        let cal = Calendar.current
+        let from = cal.date(byAdding: .day, value: -1, to: payday) ?? payday
+
+        let all = CombinedPayEventsEngine.upcomingBreakdowns(
+            context: context,
+            count: 16,
+            from: from,
+            calendar: cal
+        )
+
+        // Prefer the period that *contains* the target payday in (start, end].
+        if let hit = all.first(where: { p in
+            // strict after start, inclusive of end (engine uses (start, end])
+            (p.period.start < payday) && (payday <= p.period.end)
+        }) {
+            return hit
+        }
+
+        // Fallback: match by same-day end, but ignore zero-length periods.
+        if let byEnd = all.first(where: { sod($0.period.end) == sod(payday) && $0.period.start < $0.period.end }) {
+            return byEnd
+        }
+
+        // Last resort: first non-zero period.
+        return all.first(where: { $0.period.start < $0.period.end }) ?? all.first
+    }
+
 
     var body: some View {
-        List {
-            // SUMMARY
-            Section {
-                summaryCard()
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-            }
-
-            // INCOME (card-like)
-            Section("Income") { // ← renamed from "Incomes"
-                let rows: [IncomeRowData] = breakdown.period.incomes.map { inc in
-                    IncomeRowData(
-                        id: inc.id,
-                        name: inc.source.name.isEmpty ? "Untitled Income" : inc.source.name,
-                        // PeriodIncome doesn't carry its own date — show this period’s payday
-                        paidDate: breakdown.period.payday,
-                        amount: inc.amount
-                    )
-                }
-
-                ForEach(rows) { row in
-                    incomeCard(name: row.name, paidDate: row.paidDate, amount: row.amount)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
-            }
-
-            // BILLS (card-like, with "Due ..." and sorted by most-recently due first)
-            Section("Bills") {
-                // Map → then sort by most-recently due first (latest date desc) in one expression
-                let rows: [BillRowData] = billsRowsSortedMostRecentFirst()
-
-                ForEach(rows) { row in
-                    billCard(row: row)
-                        .listRowInsets(EdgeInsets())
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                }
+        Group {
+            if let b = breakdown {
+                content(for: b)
+            } else {
+                missingState
             }
         }
-        .listStyle(.plain)
-        .listRowSeparator(.hidden)
-        .listSectionSeparator(.hidden, edges: .all)
-        .scrollContentBackground(.hidden)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Main content
+
+    @ViewBuilder
+    private func content(for b: CombinedBreakdown) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+
+                // Big header range like screenshot (Sep 29 – Oct 13, 2025)
+                Text("\(dateMedium(b.period.start)) – \(dateMedium(b.period.end))")
+                    .font(.largeTitle.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+                    .padding(.horizontal, 16)
+
+                // Metrics card (centered columns + carry-in row divider)
+                VStack(spacing: 0) {
+                    HStack(spacing: 24) {
+                        metricColumn(title: "Income", value: currency(b.incomeTotal))
+                        metricColumn(title: "Bills", value: currency(b.billsTotal))
+                        metricColumn(title: "Remaining", value: currency(b.incomeTotal + b.carryIn - b.billsTotal))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
+
+                    Divider().padding(.horizontal, 16)
+
+                    HStack {
+                        Text("Carry-in")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(currency(b.carryIn))
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                }
+                .ppCard()
+                .padding(.horizontal, 16)
+
+                // Incomes card
+                if !b.period.incomes.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Incomes")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 4)
+
+                        VStack(spacing: 0) {
+                            ForEach(b.period.incomes) { inc in
+                                incomeRow(inc)
+                                if inc.id != b.period.incomes.last?.id {
+                                    Divider().opacity(0.25)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.clear)
+                    }
+                    .ppCard()
+                    .padding(.horizontal, 16)
+                }
+
+                // Bills card
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Bills")
+                        .font(.headline)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+
+                    if b.items.isEmpty {
+                        Text("No bills allocated for this paycheck.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(b.items, id: \.id) { line in
+                                billRow(line)
+                                if line.id != b.items.last?.id {
+                                    Divider().opacity(0.25)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                    }
+                }
+                .ppCard()
+                .padding(.horizontal, 16)
+
+                // Subtle ledger (like your faded list under Bills)
+                ledgerSummary(b)
+                    .padding(.horizontal, 24)
+                    .padding(.top, -8)
+
+                // Remaining card at bottom
+                HStack {
+                    Text("Remaining")
+                        .font(.headline)
+                    Spacer()
+                    Text(currency(b.incomeTotal + b.carryIn - b.billsTotal))
+                        .font(.headline.weight(.semibold))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .ppCard()
+                .padding(.horizontal, 16)
+
+                Spacer(minLength: 24)
+            }
+            .padding(.bottom, 16)
+        }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Paycheck Details")
     }
 
-    // MARK: - Card builders
+    // MARK: - Empty
 
-    private func summaryCard() -> some View {
-        let carryIn   = breakdown.carryIn
-        let income    = breakdown.incomeTotal
-        let startBal  = income + carryIn
-        let billsSum  = breakdown.billsTotal
-        let remaining = startBal - billsSum
-
-        return CardRow {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(formatDateRange(start: breakdown.period.start, end: breakdown.period.end))
-                    .font(.headline)
-
-                HStack(spacing: 16) {
-                    labeledValue("Income", value: formatCurrency(income))
-                    labeledValue("Bills", value: formatCurrency(billsSum))
-                    labeledValue("Remaining", value: formatCurrency(remaining))
-                }
+    private var missingState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "tray")
+                .font(.system(size: 36, weight: .regular))
+                .foregroundStyle(.secondary)
+            Text("No data for this paycheck")
+                .font(.headline)
+            Text("Add an income schedule and some bills to see allocations.")
                 .font(.subheadline)
-
-                if carryIn != 0 {
-                    carryInBadge(carryIn)
-                        .padding(.top, 2)
-                }
-            }
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+        .background(Color(.systemGroupedBackground))
     }
 
-    private func incomeCard(name: String, paidDate: Date, amount: Decimal) -> some View {
-        CardRow {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                    Text("Paid " + mediumDate(paidDate))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(formatCurrency(amount))
-                    .bold()
-                    .monospacedDigit()
-            }
-        }
-    }
+    // MARK: - Pieces
 
-    private func billCard(row: BillRowData) -> some View {
-        CardRow {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.title)
-                        .lineLimit(2)
-                        .truncationMode(.tail)
-
-                    if let category = row.category {
-                        Text(category)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    // If multiple occurrences, show "amountEach × N"
-                    if row.occurrences > 1 {
-                        Text("\(formatCurrency(row.amountEach)) × \(row.occurrences)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer(minLength: 8)
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    if !row.dueDates.isEmpty {
-                        Text("Due " + joinedShortDates(row.dueDates)) // ← clarity label
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(formatCurrency(row.total))
-                        .bold()
-                        .monospacedDigit()
-                }
-            }
-        }
-    }
-
-    private func labeledValue(_ label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
+    @ViewBuilder
+    private func metricColumn(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             Text(value)
-                .bold()
-                .monospacedDigit()
+                .font(.headline.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .minimumScaleFactor(0.9)
         }
-    }
-
-    // MARK: - Bill rows (mapping + sorting)
-
-    private func billsRowsSortedMostRecentFirst() -> [BillRowData] {
-        let cal = Calendar(identifier: .gregorian)
-        return breakdown.items
-            .map { line in
-                let b = line.bill
-                let dates = dueDates(for: b, in: breakdown.period, cal: cal)
-                return BillRowData(
-                    id: line.id,
-                    title: b.name,
-                    category: b.category.isEmpty ? nil : b.category,
-                    dueDates: dates,
-                    amountEach: line.amountEach,
-                    occurrences: line.occurrences,
-                    total: line.total
-                )
-            }
-            .sorted { a, b in
-                // Sort by latest due date DESC; items with no due date go to the bottom.
-                (a.dueDates.max() ?? .distantPast) < (b.dueDates.max() ?? .distantPast)
-            }
-    }
-
-    // MARK: - Due dates inside [period.start, period.end)
-
-    /// Compute all due dates for a bill inside the given period (start-inclusive, end-exclusive),
-    /// mirroring the allocation rules without touching the engine.
-    private func dueDates(for bill: Bill, in period: CombinedPeriod, cal: Calendar) -> [Date] {
-        let start = cal.startOfDay(for: period.start)
-        let end   = cal.startOfDay(for: period.end)
-
-        switch bill.recurrence {
-        case .once:
-            let d = cal.startOfDay(for: bill.anchorDueDate)
-            return (d >= start && d < end) ? [d] : []
-
-        case .weekly:
-            return strideDates(from: bill.anchorDueDate, everyDays: 7, in: start, end, cal: cal)
-
-        case .biweekly:
-            return strideDates(from: bill.anchorDueDate, everyDays: 14, in: start, end, cal: cal)
-
-        case .monthly:
-            let day = max(1, min(28, cal.component(.day, from: bill.anchorDueDate)))
-            return monthlyDates(day: day, in: start, end, cal: cal)
-
-        case .semimonthly:
-            let aDay = cal.component(.day, from: bill.anchorDueDate)
-            // keep parity logic consistent with your allocator
-            let (d1, d2) = aDay <= 15 ? (max(1, min(28, aDay)), 30) : (1, max(1, min(28, aDay)))
-            return semiMonthlyDates(d1: d1, d2: d2, in: start, end, cal: cal)
-        }
-    }
-
-    private func strideDates(from anchor: Date, everyDays: Int, in start: Date, _ end: Date, cal: Calendar) -> [Date] {
-        var d = cal.startOfDay(for: anchor)
-        while d < start {
-            d = cal.date(byAdding: .day, value: everyDays, to: d)
-                ?? d.addingTimeInterval(Double(everyDays) * 86400)
-        }
-        var out: [Date] = []
-        while d < end {
-            out.append(d)
-            d = cal.date(byAdding: .day, value: everyDays, to: d)
-                ?? d.addingTimeInterval(Double(everyDays) * 86400)
-        }
-        return out
-    }
-
-    private func monthlyDates(day: Int, in start: Date, _ end: Date, cal: Calendar) -> [Date] {
-        let dayClamped = max(1, min(28, day))
-        var comps = cal.dateComponents([.year, .month], from: start)
-        var out: [Date] = []
-        while true {
-            guard let y = comps.year, let m = comps.month else { break }
-            var c = DateComponents(); c.year = y; c.month = m; c.day = dayClamped
-            if let d = cal.date(from: c), d >= start && d < end { out.append(d) }
-            comps.month = m + 1
-            if (cal.date(from: comps) ?? end) >= end { break }
-        }
-        return out
-    }
-
-    private func semiMonthlyDates(d1: Int, d2: Int, in start: Date, _ end: Date, cal: Calendar) -> [Date] {
-        let days = [max(1, min(28, d1)), max(1, min(28, d2))].sorted()
-        var comps = cal.dateComponents([.year, .month], from: start)
-        var out: [Date] = []
-        while true {
-            guard let y = comps.year, let m = comps.month else { break }
-            for dd in days {
-                var c = DateComponents(); c.year = y; c.month = m; c.day = dd
-                if let d = cal.date(from: c), d >= start && d < end { out.append(d) }
-            }
-            comps.month = m + 1
-            if (cal.date(from: comps) ?? end) >= end { break }
-        }
-        return out
-    }
-
-    // MARK: - Formatting & small pieces (mirrors PlanView)
-
-    private func formatCurrency(_ v: Decimal, code: String = "USD") -> String {
-        let n = NSDecimalNumber(decimal: v)
-        let f = NumberFormatter()
-        f.numberStyle = .currency
-        f.currencyCode = code
-        f.maximumFractionDigits = 2
-        f.minimumFractionDigits = 2
-        return f.string(from: n) ?? "$0.00"
-    }
-
-    private func mediumDate(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .none
-        return f.string(from: d)
-    }
-
-    private func joinedShortDates(_ dates: [Date]) -> String {
-        guard !dates.isEmpty else { return "" }
-        let f = DateFormatter()
-        f.dateFormat = "MMM d"
-        return dates.map { f.string(from: $0) }.joined(separator: ", ")
-    }
-
-    /// Keep this identical to PlanView so ranges match visually
-    private func formatDateRange(start: Date, end: Date) -> String {
-        let cal = Calendar.current
-        let sComp = cal.dateComponents([.year, .month, .day], from: start)
-        let eComp = cal.dateComponents([.year, .month, .day], from: end)
-
-        let dfDay = DateFormatter(); dfDay.dateFormat = "d"
-        let dfMonth = DateFormatter.cached("MMM")
-        let dfMonthDay = DateFormatter(); dfMonthDay.dateFormat = "MMM d"
-        let dfMonthDayYear = DateFormatter(); dfMonthDayYear.dateFormat = "MMM d, yyyy"
-
-        if sComp.year != eComp.year {
-            return "\(dfMonthDayYear.string(from: start))–\(dfMonthDayYear.string(from: end))"
-        }
-        if sComp.month == eComp.month {
-            return "\(dfMonth.string(from: start)) \(dfDay.string(from: start))–\(dfDay.string(from: end)), \(sComp.year!)"
-        } else {
-            return "\(dfMonthDay.string(from: start))–\(dfMonthDay.string(from: end)), \(sComp.year!)"
-        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
-    private func carryInBadge(_ amount: Decimal) -> some View {
-        let positive = amount >= 0
-        let label = positive ? "Carry-in" : "Carry-over"
-        let display = positive ? "+\(formatCurrency(amount))" : formatCurrency(amount)
+    private func incomeRow(_ inc: PeriodIncome) -> some View {
+        // Find this income’s schedule to display its frequency subtitle.
+        let freqText: String = {
+            if let s = schedules.first(where: { $0.source?.persistentModelID == inc.source.persistentModelID }) {
+                return frequencyLabel(s.frequency)
+            }
+            return ""
+        }()
 
-        HStack(spacing: 6) {
-            Image(systemName: positive ? "arrow.down.right.circle.fill" : "arrow.up.right.circle.fill")
-                .imageScale(.small)
-            Text("\(label) \(display)")
-                .font(.caption2.weight(.semibold))
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(inc.source.name.isEmpty ? "Income" : inc.source.name)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+                if !freqText.isEmpty {
+                    Text(freqText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 12)
+            Text(currency(inc.amount))
+                .font(.body.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.thinMaterial, in: Capsule())
-        .overlay(Capsule().strokeBorder(.quaternary, lineWidth: 0.5))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(inc.source.name), \(currency(inc.amount))")
+    }
+
+    @ViewBuilder
+    private func billRow(_ line: AllocatedBillLine) -> some View {
+        let recurrence = frequencyLabel({
+            switch line.bill.recurrence {
+            case .once:         return .once
+            case .weekly:       return .weekly
+            case .biweekly:     return .biweekly
+            case .semimonthly:  return .semimonthly
+            case .monthly:      return .monthly
+            }
+        }())
+
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(line.bill.name)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
+                    Text(recurrence)
+                    Text("•")
+                    Text("due \(dateShortDay(line.bill.anchorDueDate))")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(currency(line.total))
+                .font(.body.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(line.bill.name), \(currency(line.total))")
+    }
+
+    // MARK: - Ledger (faded)
+
+    @ViewBuilder
+    private func ledgerSummary(_ b: CombinedBreakdown) -> some View {
+        let start = b.incomeTotal + b.carryIn
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Start (Income + Carry-in)")
+                Spacer()
+                Text(currency(start))
+            }
+            ForEach(b.items, id: \.id) { line in
+                HStack {
+                    Text("–  \(line.bill.name) — \(dateShortDay(line.bill.anchorDueDate))")
+                    Spacer()
+                    Text("− \(currency(line.total))")
+                }
+            }
+            HStack {
+                Text("=  Remaining")
+                Spacer()
+                Text(currency(b.incomeTotal + b.carryIn - b.billsTotal))
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .opacity(0.6)
     }
 }
 
-// Keep the cached DateFormatter helper at file scope
-    extension DateFormatter {
-    static func cached(_ fmt: String) -> DateFormatter {
-        let df = DateFormatter()
-        df.dateFormat = fmt
-        return df
+// MARK: - Simple Card look (swap to CardKit by replacing the modifier)
+
+private struct PPCard: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, 4)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.black.opacity(0.04), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 4)
     }
+}
+
+private extension View {
+    /// Replace `.ppCard()` with your CardKit modifier (e.g., `.cardContainer()`).
+    func ppCard() -> some View { self.modifier(PPCard()) }
 }

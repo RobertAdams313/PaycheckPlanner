@@ -3,7 +3,8 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Updated on 9/2/25
+//  Updated on 9/4/25 – Card UI preserved, concrete NavigationLink initializers,
+//                      DateFormatter cache added locally, no custom ButtonStyle.
 //
 
 import SwiftUI
@@ -49,116 +50,65 @@ struct PlanView: View {
         return allocated.filter { $0.period.end <= today }.count
     }
 
-    /// Display string for the badge (cap at 99+)
-    private var previousCountDisplay: String {
-        previousCount > 99 ? "99+" : "\(previousCount)"
-    }
+    private var previousCountDisplay: String { previousCount > 99 ? "99+" : "\(previousCount)" }
 
-    // MARK: - Body (centered column layout)
+    // MARK: - Body
 
     var body: some View {
         NavigationStack {
-            Group {
-                if schedules.isEmpty {
-                    emptyState
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color(.systemGroupedBackground))
-                } else {
-                    ScrollView {
-                        VStack(spacing: 16) {
+            if schedules.isEmpty {
+                emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGroupedBackground))
+                    .navigationTitle("Plan")
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 16) {
 
-                            // Current
-                            if let current = upcomingBreakdowns.first {
-                                currentHeader(for: current)
-                                NavigationLink {
-                                    PaycheckDetailView(breakdown: current)
-                                } label: {
-                                    periodCard(current, emphasizeCurrent: true)
-                                }
+                        // Current period
+                        if let current = upcomingBreakdowns.first {
+                            currentHeader(for: current)
+                            NavigationLink(
+                                destination: PaycheckDetailView(payday: current.period.payday),
+                                label: { periodCard(current, emphasizeCurrent: true) }
+                            )
+                            .buttonStyle(.plain)
+                        }
+
+                        // Upcoming periods
+                        let upcoming = Array(upcomingBreakdowns.dropFirst())
+                        if !upcoming.isEmpty {
+                            sectionTitle("Upcoming")
+                            ForEach(upcoming) { b in
+                                NavigationLink(
+                                    destination: PaycheckDetailView(payday: b.period.payday),
+                                    label: { periodCard(b, emphasizeCurrent: false) }
+                                )
                                 .buttonStyle(.plain)
                             }
-
-                            // Upcoming
-                            let upcoming = Array(upcomingBreakdowns.dropFirst())
-                            if !upcoming.isEmpty {
-                                sectionTitle("Upcoming")
-                                ForEach(upcoming) { b in
-                                    NavigationLink {
-                                        PaycheckDetailView(breakdown: b)
-                                    } label: {
-                                        periodCard(b, emphasizeCurrent: false)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-
-                            // Previous periods entry
-                            if previousCount > 0 {
-                                NavigationLink {
-                                    PreviousPeriodsView()
-                                } label: {
-                                    previousCard()
-                                }
-                                .buttonStyle(PressCardStyle())
-                                .accessibilityLabel("Show Previous Pay Periods, \(previousCountDisplay)")
-                            }
                         }
-                        .frame(maxWidth: 700)
-                        .padding(.horizontal)
-                        .padding(.vertical, 12)
+
+                        // Previous periods entry
+                        if previousCount > 0 {
+                            NavigationLink(
+                                destination: PreviousPeriodsView(),
+                                label: { previousCard() }
+                            )
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show Previous Pay Periods, \(previousCountDisplay)")
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .background(Color(.systemGroupedBackground))
+                    .frame(maxWidth: 700)
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .background(Color(.systemGroupedBackground))
+                .navigationTitle("Plan")
             }
-            .navigationTitle("Plan")
         }
-        // One-time data repair so income sources are linked from schedules.
         .task { await repairIncomeBacklinks() }
-        // 🔍 DEBUG PROBE (background)
-        .task {
-            do {
-                try await context.background { bg in
-                    let cal = Calendar.current
-                    let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"
-
-                    let schedules = try bg.fetch(FetchDescriptor<IncomeSchedule>())
-
-                    print("🧭 Schedules in store: \(schedules.count)")
-                    for s in schedules {
-                        let srcName = (s.source?.name.isEmpty == false) ? s.source!.name : "Unnamed"
-                        print(" – \(srcName) | \(s.frequency) @ \(f.string(from: s.anchorDate)) | semi \(s.semimonthlyFirstDay)/\(s.semimonthlySecondDay)")
-
-                        let probe = CombinedPayEventsEngine.combinedPeriods(
-                            schedules: [s],
-                            count: 2,
-                            from: Date.now,
-                            using: cal
-                        )
-                        if let p = probe.first {
-                            print("    grid: \(f.string(from: p.start)) → \(f.string(from: p.end)) (payday \(f.string(from: p.payday)))")
-                        }
-                    }
-
-                    let periods = CombinedPayEventsEngine.combinedPeriods(
-                        schedules: schedules,
-                        count: 6,
-                        from: Date.now,
-                        using: cal
-                    )
-
-                    print("🔎 Period probe (combined): \(periods.count) periods")
-                    for p in periods {
-                        let inc = p.incomes
-                            .map { "\($0.source.name.isEmpty ? "Untitled" : $0.source.name): \(NSDecimalNumber(decimal: $0.amount))" }
-                            .joined(separator: ", ")
-                        print(" • \(f.string(from: p.start)) → \(f.string(from: p.end)) (payday \(f.string(from: p.payday))) | incomes: [\(inc)]  total=\(NSDecimalNumber(decimal: p.incomeTotal))")
-                    }
-                }
-            } catch {
-                print("🔧 PlanView probe failed: \(error)")
-            }
-        }
+        .task { await debugProbe() }
     }
 
     // MARK: - Section headers (centered-friendly)
@@ -197,7 +147,6 @@ struct PlanView: View {
         let billsSum  = b.billsTotal
         let remaining = startBal - billsSum
 
-        // Build income name list once (works even if model changes types)
         let incomeNames: [String] = b.period.incomes.map { occ in
             let trimmed = occ.source.name.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? "Untitled Income" : trimmed
@@ -218,15 +167,12 @@ struct PlanView: View {
                     .monospacedDigit()
             }
 
-            // Always show Income Name chips when incomes exist
             if !incomeNames.isEmpty {
                 IncomeChipsRow(names: incomeNames)
                     .accessibilityIdentifier("incomeChips_\(b.id.uuidString)")
             }
 
-            if carryIn != 0 {
-                carryInBadge(carryIn)
-            }
+            if carryIn != 0 { carryInBadge(carryIn) }
 
             miniRunningBalance(startBalance: startBal, bills: billsSum, endBalance: remaining)
         }
@@ -251,28 +197,19 @@ struct PlanView: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
-
                 Text("Show Previous Pay Periods")
                     .font(.headline)
                     .fontWeight(.semibold)
                     .multilineTextAlignment(.center)
                     .lineLimit(1)
                     .truncationMode(.tail)
-
                 Text(previousCountDisplay)
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(.thinMaterial)
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(.quaternary, lineWidth: 0.5)
-                    )
+                    .background(Capsule(style: .continuous).fill(.thinMaterial))
+                    .overlay(Capsule(style: .continuous).strokeBorder(.quaternary, lineWidth: 0.5))
                     .accessibilityHidden(true)
-
                 Spacer(minLength: 0)
             }
             .frame(minHeight: 56)
@@ -385,10 +322,10 @@ struct PlanView: View {
         let sComp = cal.dateComponents([.year, .month, .day], from: start)
         let eComp = cal.dateComponents([.year, .month, .day], from: end)
 
-        let dfDay = DateFormatter(); dfDay.dateFormat = "d"
-        let dfMonth = DateFormatter.cached("MMM")
-        let dfMonthDay = DateFormatter(); dfMonthDay.dateFormat = "MMM d"
-        let dfMonthDayYear = DateFormatter(); dfMonthDayYear.dateFormat = "MMM d, yyyy"
+        let dfDay = DFCache.shared.day
+        let dfMonth = DFCache.shared.monthAbbrev
+        let dfMonthDay = DFCache.shared.monthDay
+        let dfMonthDayYear = DFCache.shared.monthDayYear
 
         if sComp.year != eComp.year {
             return "\(dfMonthDayYear.string(from: start))–\(dfMonthDayYear.string(from: end))"
@@ -410,34 +347,62 @@ struct PlanView: View {
         return f.string(from: n) ?? "$0.00"
     }
 
-    // MARK: - One-time backlink repair
+    // MARK: - One-time backlink repair & debug
 
     private func repairIncomeBacklinks() async {
         do {
             let srcs = try context.fetch(FetchDescriptor<IncomeSource>())
             var changed = false
-
             for src in srcs {
                 if let sched = src.schedule, sched.source == nil {
                     sched.source = src
                     changed = true
                 }
             }
-            if changed {
-                try context.save()
+            if changed { try context.save() }
+        } catch {
+            print("Backlink repair failed: \(error)")
+        }
+    }
+
+    private func debugProbe() async {
+        do {
+            try await context.background { bg in
+                let cal = Calendar.current
+                let f = DFCache.shared.mediumDate
+                let schedules = try bg.fetch(FetchDescriptor<IncomeSchedule>())
+                print("🧭 Schedules in store: \(schedules.count)")
+                for s in schedules {
+                    let srcName = (s.source?.name.isEmpty == false) ? s.source!.name : "Unnamed"
+                    print(" – \(srcName) | \(s.frequency) @ \(f.string(from: s.anchorDate)) | semi \(s.semimonthlyFirstDay)/\(s.semimonthlySecondDay)")
+                    let probe = CombinedPayEventsEngine.combinedPeriods(
+                        schedules: [s], count: 2, from: Date.now, using: cal
+                    )
+                    if let p = probe.first {
+                        print("    grid: \(f.string(from: p.start)) → \(f.string(from: p.end)) (payday \(f.string(from: p.payday)))")
+                    }
+                }
+                let periods = CombinedPayEventsEngine.combinedPeriods(
+                    schedules: schedules, count: 6, from: Date.now, using: cal
+                )
+                print("🔎 Period probe (combined): \(periods.count) periods")
+                for p in periods {
+                    let inc = p.incomes
+                        .map { "\($0.source.name.isEmpty ? "Untitled" : $0.source.name): \(NSDecimalNumber(decimal: $0.amount))" }
+                        .joined(separator: ", ")
+                    print(" • \(f.string(from: p.start)) → \(f.string(from: p.end)) (payday \(f.string(from: p.payday))) | incomes: [\(inc)]  total=\(NSDecimalNumber(decimal: p.incomeTotal))")
+                }
             }
         } catch {
-            // non-fatal
-            print("Backlink repair failed: \(error)")
+            print("🔧 PlanView probe failed: \(error)")
         }
     }
 }
 
-// MARK: - Income chips row (names only; no model type dependency)
+// MARK: - Income chips row
 
 private struct IncomeChipsRow: View {
     let names: [String]
-
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -451,7 +416,6 @@ private struct IncomeChipsRow: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Income sources for this period")
     }
-
     private func normalized(_ raw: String) -> String {
         let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return t.isEmpty ? "Untitled Income" : t
@@ -468,9 +432,35 @@ private struct Chip: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(.thinMaterial, in: Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-            )
+            .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
     }
+}
+
+// MARK: - DateFormatter cache (local, replaces any .cached extensions)
+
+private final class DFCache {
+    static let shared = DFCache()
+
+    let mediumDate: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
+    let day: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d"; return f
+    }()
+
+    let monthAbbrev: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM"; return f
+    }()
+
+    let monthDay: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
+    }()
+
+    let monthDayYear: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
+    }()
 }

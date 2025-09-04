@@ -3,6 +3,8 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 9/2/25.
+//  Updated on 9/4/25 – fixes generic-param ambiguities, removes DateFormatter.cached,
+//                      uses PaycheckDetailView(payday:), and matches PlanView styling.
 //
 
 import SwiftUI
@@ -20,19 +22,24 @@ struct PreviousPeriodsView: View {
     // Page size for incremental loading
     @State private var showCount: Int = 12
 
+    // All previous (ended before today), most-recent first
     private var previousBreakdownsAll: [CombinedBreakdown] {
-        // Generate a wide range in the past, then filter to periods that ended before today
-        let today = Calendar.current.startOfDay(for: Date.now)
-        let pastStart = Calendar.current.date(byAdding: .day, value: -365, to: today) ?? today
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let pastStart = cal.date(byAdding: .day, value: -365, to: today) ?? today
 
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
-            count: 180,           // large grid to cover past year across frequencies
-            from: pastStart
+            count: 180,                  // wide grid across past frequencies
+            from: pastStart,
+            using: cal
         )
-        let allocated = SafeAllocationEngine.allocate(bills: bills, into: periods)
+        let allocated = SafeAllocationEngine.allocate(
+            bills: bills,
+            into: periods,
+            calendar: cal
+        )
 
-        // Only those that ended strictly before today; most recent first
         return allocated
             .filter { $0.period.end <= today }
             .sorted { $0.period.end > $1.period.end }
@@ -50,35 +57,35 @@ struct PreviousPeriodsView: View {
                 noHistoryState
             } else {
                 ScrollView {
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
 
                         // Header
                         header
 
                         // Cards
                         ForEach(previousBreakdownsPaged) { b in
-                            NavigationLink {
-                                PaycheckDetailView(breakdown: b)
-                            } label: {
-                                periodCard(b)
-                            }
+                            NavigationLink(
+                                destination: PaycheckDetailView(payday: b.period.payday),
+                                label: { periodCard(b) }
+                            )
                             .buttonStyle(.plain)
                         }
 
                         // Load More
                         if showCount < previousBreakdownsAll.count {
-                            Button {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    showCount = min(previousBreakdownsAll.count, showCount + 12)
-                                }
-                            } label: {
-                                loadMoreCard(remaining: previousBreakdownsAll.count - showCount)
-                            }
-                            .buttonStyle(PressCardStyle())
+                            Button(
+                                action: {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        showCount = min(previousBreakdownsAll.count, showCount + 12)
+                                    }
+                                },
+                                label: { loadMoreCard(remaining: previousBreakdownsAll.count - showCount) }
+                            )
+                            .buttonStyle(.plain) // replaced custom PressCardStyle()
                             .padding(.top, 4)
                         }
                     }
-                    .frame(maxWidth: 700) // match PlanView column, adjust to taste
+                    .frame(maxWidth: 700) // match PlanView column
                     .padding(.horizontal)
                     .padding(.vertical, 12)
                 }
@@ -164,14 +171,8 @@ struct PreviousPeriodsView: View {
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(.thinMaterial)
-                    )
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(.quaternary, lineWidth: 0.5)
-                    )
+                    .background(Capsule(style: .continuous).fill(.thinMaterial))
+                    .overlay(Capsule(style: .continuous).strokeBorder(.quaternary, lineWidth: 0.5))
                     .accessibilityHidden(true)
                 Spacer(minLength: 0)
             }
@@ -292,8 +293,7 @@ struct PreviousPeriodsView: View {
     // MARK: - Formatting
 
     private func formatMonthYear(_ d: Date) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "MMM yyyy"
+        let df = DFCache.shared.monthYear
         return df.string(from: d)
     }
 
@@ -302,10 +302,10 @@ struct PreviousPeriodsView: View {
         let sComp = cal.dateComponents([.year, .month, .day], from: start)
         let eComp = cal.dateComponents([.year, .month, .day], from: end)
 
-        let dfDay = DateFormatter(); dfDay.dateFormat = "d"
-        let dfMonth = DateFormatter.cached("MMM")
-        let dfMonthDay = DateFormatter(); dfMonthDay.dateFormat = "MMM d"
-        let dfMonthDayYear = DateFormatter(); dfMonthDayYear.dateFormat = "MMM d, yyyy"
+        let dfDay = DFCache.shared.day
+        let dfMonth = DFCache.shared.monthAbbrev
+        let dfMonthDay = DFCache.shared.monthDay
+        let dfMonthDayYear = DFCache.shared.monthDayYear
 
         if sComp.year != eComp.year {
             return "\(dfMonthDayYear.string(from: start))–\(dfMonthDayYear.string(from: end))"
@@ -326,4 +326,30 @@ struct PreviousPeriodsView: View {
         f.minimumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
     }
+}
+
+// MARK: - DateFormatter cache (local; replaces any .cached extension)
+
+private final class DFCache {
+    static let shared = DFCache()
+
+    let monthYear: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM yyyy"; return f
+    }()
+
+    let day: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d"; return f
+    }()
+
+    let monthAbbrev: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM"; return f
+    }()
+
+    let monthDay: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
+    }()
+
+    let monthDayYear: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM d, yyyy"; return f
+    }()
 }
