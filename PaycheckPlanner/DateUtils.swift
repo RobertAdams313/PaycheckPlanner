@@ -87,7 +87,7 @@ struct PayDateUtils {
         let d2 = schedule.semimonthlySecondDay
         let days = [d1, d2].sorted()
         
-        guard let year = comps.year, let month = comps.month, let day = comps.day else {
+        guard let month = comps.month, let day = comps.day else {
             return base
         }
         

@@ -28,9 +28,11 @@ struct PlanView: View {
     private var upcomingBreakdowns: [CombinedBreakdown] {
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
-            count: max(planCount, 1) + 1 // current + N upcoming
+            count: max(planCount, 1) + 1,
+            from: Date.now,
+            using: .current
         )
-        return SafeAllocationEngine.allocate(bills: bills, into: periods)
+        return SafeAllocationEngine.allocate(bills: bills, into: periods, calendar: .current)
     }
 
     /// Number of previous periods available (ended strictly before today).
@@ -40,9 +42,10 @@ struct PlanView: View {
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
             count: 60,
-            from: pastStart
+            from: pastStart,
+            using: .current
         )
-        let allocated = SafeAllocationEngine.allocate(bills: bills, into: periods)
+        let allocated = SafeAllocationEngine.allocate(bills: bills, into: periods, calendar: .current)
         return allocated.filter { $0.period.end <= today }.count
     }
 
@@ -72,7 +75,7 @@ struct PlanView: View {
                                 } label: {
                                     periodCard(current, emphasizeCurrent: true)
                                 }
-                                .buttonStyle(.plain) // keep card look
+                                .buttonStyle(.plain)
                             }
 
                             // Upcoming
@@ -89,7 +92,7 @@ struct PlanView: View {
                                 }
                             }
 
-                            // Previous periods entry (centered card-like button)
+                            // Previous periods entry
                             if previousCount > 0 {
                                 NavigationLink {
                                     PreviousPeriodsView()
@@ -100,12 +103,11 @@ struct PlanView: View {
                                 .accessibilityLabel("Show Previous Pay Periods, \(previousCountDisplay)")
                             }
                         }
-                        // Column width + centering
-                        .frame(maxWidth: 700)               // tweak 640–760 to taste
+                        .frame(maxWidth: 700)
                         .padding(.horizontal)
                         .padding(.vertical, 12)
                     }
-                    .frame(maxWidth: .infinity, alignment: .center) // center the scroll content
+                    .frame(maxWidth: .infinity, alignment: .center)
                     .background(Color(.systemGroupedBackground))
                 }
             }
@@ -195,6 +197,12 @@ struct PlanView: View {
         let billsSum  = b.billsTotal
         let remaining = startBal - billsSum
 
+        // Build income name list once (works even if model changes types)
+        let incomeNames: [String] = b.period.incomes.map { occ in
+            let trimmed = occ.source.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? "Untitled Income" : trimmed
+        }
+
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -208,6 +216,12 @@ struct PlanView: View {
                 Text(formatCurrency(remaining))
                     .bold()
                     .monospacedDigit()
+            }
+
+            // Always show Income Name chips when incomes exist
+            if !incomeNames.isEmpty {
+                IncomeChipsRow(names: incomeNames)
+                    .accessibilityIdentifier("incomeChips_\(b.id.uuidString)")
             }
 
             if carryIn != 0 {
@@ -261,7 +275,7 @@ struct PlanView: View {
 
                 Spacer(minLength: 0)
             }
-            .frame(minHeight: 56) // HIG tap target with room for badge
+            .frame(minHeight: 56)
             .padding(.horizontal, 6)
             .padding(.vertical, 8)
         }
@@ -300,16 +314,15 @@ struct PlanView: View {
         .overlay(Capsule().strokeBorder(.quaternary, lineWidth: 0.5))
     }
 
-    // MARK: - Running balance bar (HIG-compliant + single-line title/percent)
+    // MARK: - Running balance bar
 
     private func miniRunningBalance(startBalance: Decimal, bills: Decimal, endBalance: Decimal) -> some View {
         let start = max(0, (startBalance as NSDecimalNumber).doubleValue)
         let spend = max(0, (bills as NSDecimalNumber).doubleValue)
-        let fraction = min(max(spend / max(start, 0.0001), 0), 1) // 0...1
+        let fraction = min(max(spend / max(start, 0.0001), 0), 1)
         let percent = Int((fraction * 100).rounded())
 
         return VStack(alignment: .leading, spacing: 8) {
-            // Single-line title + percent (HIG-friendly)
             HStack {
                 Text("Bills this period")
                     .lineLimit(1)
@@ -327,7 +340,6 @@ struct PlanView: View {
                 .accessibilityLabel("Bills this period")
                 .accessibilityValue("\(percent) percent of income allocated to bills")
 
-            // Context labels under the bar
             HStack(spacing: 6) {
                 Text(formatCurrency(startBalance))
                 Spacer(minLength: 0)
@@ -368,7 +380,6 @@ struct PlanView: View {
 
     // MARK: - Utilities
 
-    /// Formats a period date range concisely.
     private func formatDateRange(start: Date, end: Date) -> String {
         let cal = Calendar.current
         let sComp = cal.dateComponents([.year, .month, .day], from: start)
@@ -422,48 +433,44 @@ struct PlanView: View {
     }
 }
 
-// MARK: - Shared card container (if you want to reuse on other controls)
+// MARK: - Income chips row (names only; no model type dependency)
 
-private struct CardContainer<Content: View>: View {
-    let content: Content
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
+private struct IncomeChipsRow: View {
+    let names: [String]
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(.ultraThinMaterial)
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.separator.opacity(0.15))
-            )
-            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-            .overlay(
-                VStack(spacing: 12) {
-                    content
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(names.map(normalized), id: \.self) { title in
+                    Chip(title: title)
                 }
-                .padding(14)
-            )
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal)
+            }
+            .padding(.vertical, 2)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Income sources for this period")
+    }
+
+    private func normalized(_ raw: String) -> String {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "Untitled Income" : t
+    }
+}
+
+private struct Chip: View {
+    let title: String
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+            .padding(.horizontal, 10)
             .padding(.vertical, 6)
-    }
-}
-
-// MARK: - Pressed effect for card-like controls (HIG-friendly)
-
-private struct PressCardStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .opacity(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-            .sensoryFeedback(.selection, trigger: configuration.isPressed) // subtle haptic on touch down (where supported)
-    }
-}
-
-private extension DateFormatter {
-    static func cached(_ fmt: String) -> DateFormatter {
-        let df = DateFormatter()
-        df.dateFormat = fmt
-        return df
+            .background(.thinMaterial, in: Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
     }
 }

@@ -1,6 +1,14 @@
+//
+//  NextPaycheckWidget.swift
+//  PaycheckPlannerWidgets
+//
+
+import Foundation
 import WidgetKit
 import SwiftUI
 import AppIntents
+
+// MARK: - Entry
 
 struct NextPaycheckEntry: TimelineEntry {
     let date: Date
@@ -8,11 +16,20 @@ struct NextPaycheckEntry: TimelineEntry {
     let income: Decimal
     let billsTotal: Decimal
     let leftover: Decimal
-    let topBills: [SharedAppGroup.Snapshot.TopBill]
-    static let placeholder = NextPaycheckEntry(date: .now, payday: .now, income: 0, billsTotal: 0, leftover: 0, topBills: [])
+    let topBills: [TopBill]
+
+    static let placeholder = NextPaycheckEntry(
+        date: Date(),
+        payday: Date(),
+        income: 0,
+        billsTotal: 0,
+        leftover: 0,
+        topBills: []
+    )
 }
 
-// Use AppIntentTimelineProvider so the widget can be configured with an intent.
+// MARK: - Provider
+
 struct NextPaycheckProvider: AppIntentTimelineProvider {
     typealias Intent = PaycheckDisplayConfigIntent
     typealias Entry = NextPaycheckEntry
@@ -20,43 +37,56 @@ struct NextPaycheckProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> Entry { .placeholder }
 
     func snapshot(for configuration: Intent, in context: Context) async -> Entry {
-        // let mode = configuration.mode ?? .leftoverOnly  // use if you branch on mode later
-        return loadEntry() ?? .placeholder
+        loadEntry() ?? .placeholder
     }
 
     func timeline(for configuration: Intent, in context: Context) async -> Timeline<Entry> {
-        // let mode = configuration.mode ?? .leftoverOnly
         let entry = loadEntry() ?? .placeholder
-        let refresh = min(entry.payday, Date().addingTimeInterval(60*60))
+        // refresh sooner of: one hour from now or the payday
+        let refresh = min(entry.payday, Date().addingTimeInterval(60 * 60))
         return Timeline(entries: [entry], policy: .after(refresh))
     }
 
-    // ... loadEntry() unchanged ...
+    // MARK: - Load from shared snapshot
 
     private func loadEntry() -> Entry? {
+        // Assuming you have a SharedAppGroup.load() that returns Snapshot
         if let snap = SharedAppGroup.load() {
-            return Entry(date: Date(),
-                         payday: snap.payday,
-                         income: snap.income,
-                         billsTotal: snap.billsTotal,
-                         leftover: snap.leftover,
-                         topBills: snap.topBills)
+            return Entry(
+                date: Date(),
+                payday: snap.payday,
+                income: snap.incomeTotal,
+                billsTotal: snap.billsTotal,
+                leftover: snap.remaining,
+                topBills: snap.topBills
+            )
         }
         return nil
     }
 }
 
+// MARK: - View
+
 struct NextPaycheckWidgetView: View {
     var entry: NextPaycheckEntry
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Next payday").font(.caption).foregroundStyle(.secondary)
-            Text(entry.payday, style: .date).font(.headline)
+            Text("Next payday")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(entry.payday, style: .date)
+                .font(.headline)
 
             HStack {
-                Text("Leftover").font(.caption).foregroundStyle(.secondary)
+                Text("Leftover")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Spacer()
-                Text(format(entry.leftover)).bold().monospacedDigit()
+                Text(format(entry.leftover))
+                    .bold()
+                    .monospacedDigit()
                     .foregroundStyle(entry.leftover >= 0 ? .green : .red)
             }
 
@@ -86,11 +116,16 @@ struct NextPaycheckWidgetView: View {
         .containerBackground(for: .widget) { Color.clear }
         .padding(12)
     }
+
     private func format(_ value: Decimal) -> String {
-        let f = NumberFormatter(); f.numberStyle = .currency; f.locale = .current
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.locale = .current
         return f.string(from: value as NSDecimalNumber) ?? "$0"
     }
 }
+
+// MARK: - Widget
 
 struct NextPaycheckWidget: Widget {
     var body: some WidgetConfiguration {

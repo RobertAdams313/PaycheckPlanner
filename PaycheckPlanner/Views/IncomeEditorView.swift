@@ -3,7 +3,7 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Updated on 9/2/25 – Amount editor clears on focus & auto-commits on blur; safe schedule bindings; Delete button
+//  Updated on 9/2/25 – Amount editor clears on focus & auto-commits on blur/other-control; safe schedule bindings; Delete button
 //
 
 import SwiftUI
@@ -17,6 +17,7 @@ private func ppFormatCurrency(_ d: Decimal) -> String {
     f.numberStyle = .currency
     f.maximumFractionDigits = 2
     f.minimumFractionDigits = 2
+    f.locale = .current
     return f.string(from: n) ?? "$0.00"
 }
 
@@ -84,6 +85,7 @@ struct IncomeEditorView: View {
                 let freqBinding = Binding<PayFrequency>(
                     get: { sched.frequency },
                     set: { new in
+                        commitFromOtherControl()
                         sched.frequency = new
                         source.schedule = sched
                     }
@@ -92,6 +94,7 @@ struct IncomeEditorView: View {
                 let dateBinding = Binding<Date>(
                     get: { sched.anchorDate },
                     set: { new in
+                        commitFromOtherControl()
                         sched.anchorDate = new
                         source.schedule = sched
                     }
@@ -100,6 +103,7 @@ struct IncomeEditorView: View {
                 let firstDayBinding = Binding<Int>(
                     get: { sched.semimonthlyFirstDay },
                     set: { new in
+                        commitFromOtherControl()
                         sched.semimonthlyFirstDay = new
                         source.schedule = sched
                     }
@@ -108,6 +112,7 @@ struct IncomeEditorView: View {
                 let secondDayBinding = Binding<Int>(
                     get: { sched.semimonthlySecondDay },
                     set: { new in
+                        commitFromOtherControl()
                         sched.semimonthlySecondDay = new
                         source.schedule = sched
                     }
@@ -186,6 +191,12 @@ struct IncomeEditorView: View {
         } else {
             amountText = ppFormatCurrency(newValue)
         }
+    }
+
+    /// Treat changing other controls as "Done" for the amount field.
+    private func commitFromOtherControl() {
+        if amountFocused { amountFocused = false }
+        commitAmount()
     }
 
     /// Guarantee a schedule exists so bindings are safe.

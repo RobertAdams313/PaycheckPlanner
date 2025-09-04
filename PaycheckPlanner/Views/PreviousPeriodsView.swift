@@ -327,23 +327,3 @@ struct PreviousPeriodsView: View {
         return f.string(from: n) ?? "$0.00"
     }
 }
-
-// MARK: - Pressed effect (same as PlanView)
-
-private struct PressCardStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
-            .opacity(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-            .sensoryFeedback(.selection, trigger: configuration.isPressed)
-    }
-}
-
-private extension DateFormatter {
-    static func cached(_ fmt: String) -> DateFormatter {
-        let df = DateFormatter()
-        df.dateFormat = fmt
-        return df
-    }
-}

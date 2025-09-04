@@ -3,7 +3,8 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Updated on 9/2/25 – Card UI parity; explicit NavigationLink(destination:) to avoid value-based routing stalls
+//  Updated on 9/3/25 – Adds “Main income” UI (star badge, swipe action, context menu) without removing existing behaviors.
+//                       Preserves Card UI parity; explicit NavigationLink(destination:) to avoid value-based routing stalls
 //
 
 import SwiftUI
@@ -37,23 +38,6 @@ private func currency(_ d: Decimal) -> String {
     return f.string(from: n) ?? "$0.00"
 }
 
-/// Frosted blur-card (shared)
-private struct FrostCard<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        content
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
-    }
-}
-
 // MARK: - View
 
 struct IncomeSourcesView: View {
@@ -82,6 +66,10 @@ struct IncomeSourcesView: View {
                                 FrostCard { incomeRow(src) }
                             }
                             .buttonStyle(.plain)
+                            .contextMenu { mainContextMenu(for: src) }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                mainSwipeActions(for: src)
+                            }
                         }
                     }
                 }
@@ -134,13 +122,33 @@ struct IncomeSourcesView: View {
 
     @ViewBuilder
     private func incomeRow(_ src: IncomeSource) -> some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            // Leading badge for "main"
+            if let sched = src.schedule, sched.isMain {
+                Image(systemName: "star.fill")
+                    .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
+            }
+
             VStack(alignment: .leading, spacing: 2) {
-                Text(src.name.isEmpty ? "Untitled Income" : src.name)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 6) {
+                    Text(src.name.isEmpty ? "Untitled Income" : src.name)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if let sched = src.schedule, sched.isMain {
+                        Text("Main")
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.yellow.opacity(0.18))
+                            .foregroundStyle(.yellow)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .accessibilityLabel("Main income")
+                    }
+                }
 
                 if let sched = src.schedule {
                     HStack(spacing: 8) {
@@ -164,6 +172,8 @@ struct IncomeSourcesView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens income editor. Swipe for actions.")
     }
 
     // MARK: - Empty State
@@ -194,6 +204,69 @@ struct IncomeSourcesView: View {
         let new = IncomeSource(name: "", defaultAmount: 0, variable: false, schedule: sched)
         context.insert(new)
         draftNewSource = new
+    }
+
+    // MARK: - Main income toggling
+
+    @ViewBuilder
+    private func mainSwipeActions(for src: IncomeSource) -> some View {
+        if let sched = src.schedule {
+            if sched.isMain {
+                Button {
+                    Task { @MainActor in
+                        sched.isMain = false
+                        try? context.save()
+                    }
+                } label: {
+                    Label("Clear Main", systemImage: "star.slash")
+                }
+                .tint(.gray)
+            } else {
+                Button {
+                    Task { @MainActor in
+                        // Ensure only one is main at a time
+                        if let all: [IncomeSchedule] = try? context.fetch(FetchDescriptor<IncomeSchedule>()) {
+                            for s in all { s.isMain = (s == sched) }
+                        } else {
+                            sched.isMain = true
+                        }
+                        try? context.save()
+                    }
+                } label: {
+                    Label("Make Main", systemImage: "star")
+                }
+                .tint(.yellow)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func mainContextMenu(for src: IncomeSource) -> some View {
+        if let sched = src.schedule {
+            if sched.isMain {
+                Button {
+                    Task { @MainActor in
+                        sched.isMain = false
+                        try? context.save()
+                    }
+                } label: {
+                    Label("Clear Main Income", systemImage: "star.slash")
+                }
+            } else {
+                Button {
+                    Task { @MainActor in
+                        if let all: [IncomeSchedule] = try? context.fetch(FetchDescriptor<IncomeSchedule>()) {
+                            for s in all { s.isMain = (s == sched) }
+                        } else {
+                            sched.isMain = true
+                        }
+                        try? context.save()
+                    }
+                } label: {
+                    Label("Make Main Income", systemImage: "star")
+                }
+            }
+        }
     }
 }
 

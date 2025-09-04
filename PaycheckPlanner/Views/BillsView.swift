@@ -32,24 +32,6 @@ private func dueSubtitle(_ date: Date) -> String {
     return "Due \(f.string(from: date))"
 }
 
-// MARK: - Shared Card Style
-
-private struct FrostCard<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        content
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial) // blurrier like PlanView
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
-    }
-}
-
 // MARK: - Grouping
 
 private enum BillsGrouping: String, CaseIterable, Identifiable {

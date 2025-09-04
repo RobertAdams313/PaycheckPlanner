@@ -3,8 +3,7 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Updated on 9/2/25 – Currency field clears placeholder on focus + auto-commits on blur
-//                         Adds optional Recurrence End Date with validation (builds off user file)
+//  Updated on 9/2/25 – Currency symbol, commit on blur/other-control, end-date validation
 //
 
 import SwiftUI
@@ -25,7 +24,7 @@ struct BillEditorView: View {
     @State private var recurrence: BillRecurrence = .monthly
     @State private var category: String = ""
 
-    // NEW: Recurrence end date
+    // Recurrence end date
     @State private var hasEndDate: Bool = false
     @State private var endDate: Date = .now
 
@@ -58,18 +57,18 @@ struct BillEditorView: View {
                         Text(title(for: r)).tag(r)
                     }
                 }
+                .onChange(of: recurrence) { _ in commitFromOtherControl() }
 
                 DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
                     .help("Anchor date used with the recurrence to compute occurrences.")
+                    .onChange(of: dueDate) { _ in commitFromOtherControl() }
 
-                // NEW: End date controls
                 Toggle("Has End Date", isOn: $hasEndDate.animation())
+                    .onChange(of: hasEndDate) { _ in commitFromOtherControl() }
 
                 if hasEndDate {
                     DatePicker("End Date", selection: $endDate, in: dueDate... , displayedComponents: .date)
-                        .onChange(of: dueDate) { _, newDue in
-                            if endDate < newDue { endDate = newDue }
-                        }
+                        .onChange(of: endDate) { _ in commitFromOtherControl() }
                         .accessibilityHint("No bill occurrences will be generated after this date.")
 
                     if !endDateIsValid {
@@ -84,6 +83,7 @@ struct BillEditorView: View {
             Section("Category") {
                 TextField("Category (optional)", text: $category)
                     .modifier(NameAutoCapModifier(text: $category))
+                    .onTapGesture { commitFromOtherControl() }
             }
 
             if existingBill != nil {
@@ -161,7 +161,7 @@ struct BillEditorView: View {
         dueDate = b.anchorDueDate
         category = b.category
 
-        // NEW: hydrate end date
+        // End date (if your model has it)
         if let e = b.endDate {
             hasEndDate = true
             endDate = max(Calendar.current.startOfDay(for: dueDate), e)
@@ -183,7 +183,7 @@ struct BillEditorView: View {
                 b.recurrence = recurrence
                 b.anchorDueDate = Calendar.current.startOfDay(for: dueDate)
                 b.category = category.trimmingCharacters(in: .whitespacesAndNewlines)
-                // NEW: persist end date
+                // Persist end date if your model supports it
                 b.endDate = hasEndDate ? Calendar.current.startOfDay(for: endDate) : nil
             } else {
                 // Create
@@ -220,10 +220,15 @@ struct BillEditorView: View {
             showSaveError = true
         }
     }
+
+    /// Treat switching to another control as "Done" for the amount field.
+    private func commitFromOtherControl() {
+        if amountFocused { amountFocused = false } // CurrencyField commits on blur
+    }
 }
 
 //
-// MARK: - CurrencyField (unchanged behavior; builds on your implementation)
+// MARK: - CurrencyField (builds on your implementation)
 //
 
 /// A localized currency field that binds a Decimal while:
@@ -250,7 +255,7 @@ fileprivate struct CurrencyField: View {
     }()
 
     private var placeholderCurrency: String {
-        CurrencyField.fmt.string(from: 0) ?? "0.00"
+        CurrencyField.fmt.string(from: NSNumber(value: 0)) ?? "$0.00"
     }
 
     init(_ title: String, value: Binding<Decimal>, focused: FocusState<Bool>.Binding) {
@@ -306,12 +311,11 @@ fileprivate struct CurrencyField: View {
     private func commit() {
         let dec = parseDecimal(from: text) ?? value
         value = dec
-        text = CurrencyField.fmt.string(from: NSDecimalNumber(decimal: dec)) ?? ""
+        text = CurrencyField.fmt.string(from: NSDecimalNumber(decimal: dec)) ?? placeholderCurrency
     }
 
     /// Simple, locale-tolerant numeric parse: allow digits and one decimal separator.
     private func parseDecimal(from s: String) -> Decimal? {
-        let _ = Locale.current.decimalSeparator ?? "."
         // Normalize any commas to dot for parsing, but keep user typing flexible
         let normalized = s
             .replacingOccurrences(of: ",", with: ".")

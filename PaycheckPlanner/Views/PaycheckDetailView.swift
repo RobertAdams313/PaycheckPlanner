@@ -374,7 +374,7 @@ struct PaycheckDetailView: View {
 }
 
 // Keep the cached DateFormatter helper at file scope
-private extension DateFormatter {
+    extension DateFormatter {
     static func cached(_ fmt: String) -> DateFormatter {
         let df = DateFormatter()
         df.dateFormat = fmt

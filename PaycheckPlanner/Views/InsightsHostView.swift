@@ -3,19 +3,19 @@
 //  PaycheckPlanner
 //
 //  Created by Rob on 8/24/25.
-//  Updated on 9/2/25 – Insights: centered summary, persistent legend with dim + quick view,
-//  no gray backgrounds, small header-style coverage line under title.
-//  Updated on 9/2/25 (Card UI): Wrap primary groups in blur cards to match Plan/Bills,
-//  without changing behaviors or layout intent.
+//  Updated on 9/3/25 – Async snapshot (SwiftData-safe), always-visible summary,
+//                      CardKit integration, compiler-friendly structure.
 //
 import SwiftUI
 import SwiftData
 import Charts
 
 struct InsightsHostView: View {
+    // Data
     @Query(sort: \IncomeSchedule.anchorDate, order: .forward) private var schedules: [IncomeSchedule]
     @Query(sort: \Bill.anchorDueDate, order: .forward) private var bills: [Bill]
 
+    // Settings
     @AppStorage("planPeriodCount") private var planCount: Int = 4
 
     // Export
@@ -25,37 +25,92 @@ struct InsightsHostView: View {
     // Selection for dimming + quick-view
     @State private var selectedCategory: String?
 
-    // MARK: - Data windows
+    // Snapshots (computed safely on main actor, with yields)
+    @State private var breakdownsSnap: [CombinedBreakdown] = []
+    @State private var totalsSnap: (income: Decimal, bills: Decimal, remaining: Decimal) = (0, 0, 0)
 
-    private var breakdowns: [CombinedBreakdown] {
+    // Loading/empty state
+    @State private var isLoading = true
+
+    // MARK: - Body
+
+    var body: some View {
+        NavigationStack {
+            List {
+                coverageSection()
+                summarySection()
+                categorySection()
+                periodsSection()
+            }
+            .navigationTitle("Insights")
+            .toolbar { exportToolbar() }
+            .sheet(isPresented: $showExport) { exportSheet() }
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .task { await recomputeSnapshots() }
+            .onChange(of: planCount) { _ in Task { await recomputeSnapshots() } }
+            .onChange(of: schedules.count) { _ in Task { await recomputeSnapshots() } }
+            .onChange(of: bills.count) { _ in Task { await recomputeSnapshots() } }
+        }
+    }
+
+    // MARK: - Async compute (SwiftData-safe; yields between steps)
+
+    private func recomputeSnapshots() async {
+        await MainActor.run { isLoading = true }
+
+        // Capture current values (SwiftData access on main actor)
+        let s = schedules
+        let bs = bills
+        let count = max(planCount, 1)
+
+        // Yield to avoid blocking first frame
+        await Task.yield()
+
+        // Step 1: Build periods
         let periods = CombinedPayEventsEngine.combinedPeriods(
-            schedules: schedules,
-            count: max(planCount, 1)
+            schedules: s,
+            count: count
         )
-        return SafeAllocationEngine.allocate(bills: bills, into: periods)
+
+        await Task.yield()
+
+        // Step 2: Allocate bills into periods
+        let computed = SafeAllocationEngine.allocate(
+            bills: bs,
+            into: periods
+        )
+
+        // Step 3: Totals
+        let income = computed.reduce(0) { $0 + $1.incomeTotal }
+        let carry  = computed.reduce(0) { $0 + $1.carryIn }
+        let billsT = computed.reduce(0) { $0 + $1.billsTotal }
+        let totals = (income, billsT, income + carry - billsT)
+
+        // Publish
+        await MainActor.run {
+            self.breakdownsSnap = computed
+            self.totalsSnap = totals
+            self.selectedCategory = nil
+            self.isLoading = false
+        }
     }
 
-    private var totals: (income: Decimal, bills: Decimal, remaining: Decimal) {
-        let income = breakdowns.reduce(0) { $0 + $1.incomeTotal }
-        let carry  = breakdowns.reduce(0) { $0 + $1.carryIn }
-        let billsT = breakdowns.reduce(0) { $0 + $1.billsTotal }
-        return (income, billsT, income + carry - billsT)
-    }
+    // MARK: - Derived data (from snapshots)
 
-    // Coverage line: date range + period count
     private var coverageText: String? {
-        guard let first = breakdowns.first?.period.start,
-              let last  = breakdowns.last?.period.end else { return nil }
+        guard let first = breakdownsSnap.first?.period.start,
+              let last  = breakdownsSnap.last?.period.end else { return nil }
         let df = DateFormatter()
         df.dateStyle = .medium
         df.timeStyle = .none
-        let periodsCount = breakdowns.count
+        let periodsCount = breakdownsSnap.count
         return "\(df.string(from: first)) – \(df.string(from: last)) • \(periodsCount) pay period\(periodsCount == 1 ? "" : "s")"
     }
 
     // Category slices across the visible window (sorted desc, > 0 only)
     private var categorySlices: [(category: String, amount: Decimal)] {
-        let lines = breakdowns.flatMap(\.items)
+        let lines = breakdownsSnap.flatMap(\.items)
         let grouped = Dictionary(grouping: lines, by: { ($0.bill.category.isEmpty ? "Uncategorized" : $0.bill.category) })
         return grouped
             .map { (key, vals) in (category: key, amount: vals.reduce(0) { $0 + $1.total }) }
@@ -65,7 +120,7 @@ struct InsightsHostView: View {
 
     // For quick-view panel
     private var billsByCategory: [String: [AllocatedBillLine]] {
-        let all = breakdowns.flatMap(\.items)
+        let all = breakdownsSnap.flatMap(\.items)
         return Dictionary(grouping: all, by: { $0.bill.category.isEmpty ? "Uncategorized" : $0.bill.category })
     }
 
@@ -83,145 +138,138 @@ struct InsightsHostView: View {
         return scale
     }
 
-    var body: some View {
-        NavigationStack {
-            List {
-                // MARK: Coverage (header-style, no pill)
-                if let cov = coverageText {
-                    Section {
-                        Text(cov)
-                            .font(.subheadline.weight(.semibold)) // smaller than title, header-like
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 2)
-                    }
-                    .listRowInsets(EdgeInsets())          // remove pill-like horizontal inset look
-                    .listRowBackground(Color.clear)       // ensure no colored background behind it
-                }
+    // MARK: - Sections
 
-                // MARK: Summary (centered) in Card
-                Section {
-                    CardContainer {
-                        summaryCentered(
-                            income: totals.income,
-                            bills: totals.bills,
-                            remaining: totals.remaining
-                        )
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-                .listRowBackground(Color.clear)
-
-                // MARK: Spending by Category (donut + legend + optional quick view) in Card
-                if !categorySlices.isEmpty {
-                    Section {
-                        CardContainer {
-                            VStack(spacing: 12) {
-                                donutView
-                                categoryList
-
-                                if let cat = selectedCategory,
-                                   let lines = billsByCategory[cat],
-                                   !lines.isEmpty {
-                                    quickViewDetails(category: cat, lines: lines)
-                                        .transition(.move(edge: .top).combined(with: .opacity))
-                                        .animation(.snappy, value: selectedCategory)
-                                        .padding(.top, 6)
-                                }
-                            }
-                            .padding(12)
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                    .listRowBackground(Color.clear)
-                }
-
-                // MARK: Upcoming Periods in Card (unchanged content)
-                Section {
-                    CardContainer {
-                        VStack(spacing: 0) {
-                            ForEach(breakdowns) { b in
-                                NavigationLink {
-                                    PaycheckDetailView(breakdown: b)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(b.period.payday, format: .dateTime.month().day().year())
-                                                .font(.body)
-                                                .fontWeight(.semibold)
-                                            Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        VStack(alignment: .trailing) {
-                                            Text("Bills \(formatCurrency(b.billsTotal))")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                            Text(formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal))
-                                                .bold()
-                                        }
-                                    }
-                                    .padding(.vertical, 8)
-                                }
-                                .buttonStyle(.plain)
-
-                                if b.id != breakdowns.last?.id {
-                                    Divider().padding(.leading, 4)
-                                }
-                            }
-                        }
-                        .padding(12)
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 12, trailing: 16))
-                .listRowBackground(Color.clear)
+    @ViewBuilder
+    private func coverageSection() -> some View {
+        if let cov = coverageText, !isLoading {
+            Section {
+                Text(cov)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(Edge.Set.vertical, 2)
             }
-            .navigationTitle("Insights")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Export Upcoming (CSV)") {
-                            exportURL = CSVExporter.upcomingCSV(breakdowns: breakdowns)
-                            showExport = true
-                        }
-                        Divider()
-                        Button("Export Income (CSV)") {
-                            exportURL = CSVExporter.incomeCSV(incomes: incomeSources())
-                            showExport = true
-                        }
-                        Divider()
-                        Button("Export All (CSV)") {
-                            exportURL = CSVExporter.allCSV(
-                                breakdowns: breakdowns,
-                                bills: bills,
-                                incomes: incomeSources()
-                            )
-                            showExport = true
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                }
-            }
-            .sheet(isPresented: $showExport) {
-                if let url = exportURL {
-                    ShareSheet(activityItems: [url])
-                }
-            }
-            .scrollContentBackground(.hidden) // let material cards contrast against the app bg
-            .background(Color.clear)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
         }
     }
 
-    // MARK: - Donut (persistent, dims others when selected; no background)
+    @ViewBuilder
+    private func summarySection() -> some View {
+        Section {
+            CardContainer {
+                ZStack(alignment: .center) {
+                    if isLoading {
+                        HStack(spacing: 24) {
+                            skeletonTile(title: "Income")
+                            skeletonTile(title: "Bills")
+                            skeletonTile(title: "Remaining")
+                        }
+                        .accessibilityHidden(true)
+                    }
+                    summaryCentered(
+                        income: totalsSnap.income,
+                        bills: totalsSnap.bills,
+                        remaining: totalsSnap.remaining
+                    )
+                }
+                .padding(Edge.Set.vertical, 8)
+                .padding(Edge.Set.horizontal, 12)
+            }
+        }
+        .cardListRowInsets(top: 8, leading: 16, bottom: 4, trailing: 16)
+    }
 
-    private var donutView: some View {
-        let domain = categorySlices.map(\.category)
-        let range  = categorySlices.map { categoryColorScale[$0.category] ?? .accentColor }
-        let total  = categorySlices.reduce(Decimal(0)) { $0 + $1.amount }
+    @ViewBuilder
+    private func categorySection() -> some View {
+        if !isLoading && !categorySlices.isEmpty {
+            Section {
+                CardContainer {
+                    VStack(spacing: 12) {
+                        donutView()
+                        categoryListView()
+
+                        if let cat = selectedCategory,
+                           let lines = billsByCategory[cat],
+                           !lines.isEmpty {
+                            quickViewDetails(category: cat, lines: lines)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                                .animation(.snappy, value: selectedCategory)
+                                .padding(Edge.Set.top, 6)
+                        }
+                    }
+                    .padding(Edge.Set.all, 12)
+                }
+            }
+            .cardListRowInsets(top: 4, leading: 16, bottom: 4, trailing: 16)
+        }
+    }
+
+    @ViewBuilder
+    private func periodsSection() -> some View {
+        Section {
+            CardContainer {
+                if isLoading {
+                    VStack(alignment: .leading, spacing: 8) {
+                        skeletonLine()
+                        skeletonLine()
+                        skeletonLine()
+                    }
+                    .padding(Edge.Set.all, 12)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(breakdownsSnap) { b in
+                            NavigationLink {
+                                PaycheckDetailView(breakdown: b)
+                            } label: {
+                                periodRow(b)
+                            }
+                            .buttonStyle(.plain)
+
+                            if b.id != breakdownsSnap.last?.id {
+                                Divider().padding(Edge.Set.leading, 4)
+                            }
+                        }
+                    }
+                    .padding(Edge.Set.all, 12)
+                }
+            }
+        }
+        .cardListRowInsets(top: 4, leading: 16, bottom: 12, trailing: 16)
+    }
+
+    // MARK: - Row builders
+
+    @ViewBuilder
+    private func periodRow(_ b: CombinedBreakdown) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(b.period.payday, format: .dateTime.month().day().year())
+                    .font(.body)
+                    .fontWeight(.semibold)
+                Text("\(b.period.incomes.count) source\(b.period.incomes.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text("Bills \(formatCurrency(b.billsTotal))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal))
+                    .bold()
+            }
+        }
+        .padding(Edge.Set.vertical, 8)
+    }
+
+    // MARK: - Donut + Legend
+
+    private func donutView() -> some View {
+        let domain: [String] = categorySlices.map(\.category)
+        let range: [Color]  = categorySlices.map { categoryColorScale[$0.category] ?? .accentColor }
+        let total: Decimal  = categorySlices.reduce(Decimal(0)) { $0 + $1.amount }
 
         return Chart(categorySlices, id: \.category) { item in
             let value = NSDecimalNumber(decimal: item.amount).doubleValue
@@ -246,9 +294,7 @@ struct InsightsHostView: View {
         .accessibilityHidden(true)
     }
 
-    // MARK: - Legend (persistent; dims when not selected)
-
-    private var categoryList: some View {
+    private func categoryListView() -> some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(categorySlices, id: \.category) { s in
                 Button {
@@ -272,20 +318,20 @@ struct InsightsHostView: View {
                             .font(.subheadline).monospacedDigit()
                     }
                     .contentShape(Rectangle())
-                    .padding(.vertical, 6)
+                    .padding(Edge.Set.vertical, 6)
                     .opacity(selectedCategory == nil || selectedCategory == s.category ? 1.0 : 0.45)
                 }
                 .buttonStyle(.plain)
 
                 if s.category != categorySlices.last?.category {
-                    Divider().padding(.leading, 22)
+                    Divider().padding(Edge.Set.leading, 22)
                 }
             }
         }
         .accessibilityLabel("Category breakdown list")
     }
 
-    // MARK: - Quick-view details (slide-down inline panel)
+    // MARK: - Quick-view details
 
     private func quickViewDetails(category: String, lines: [AllocatedBillLine]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -301,7 +347,7 @@ struct InsightsHostView: View {
                 .buttonStyle(.borderless)
                 .font(.caption)
             }
-            .padding(.bottom, 2)
+            .padding(Edge.Set.bottom, 2)
 
             ForEach(lines) { line in
                 HStack {
@@ -314,10 +360,10 @@ struct InsightsHostView: View {
                     Spacer()
                     Text(formatCurrency(line.total)).monospacedDigit()
                 }
-                .padding(.vertical, 2)
+                .padding(Edge.Set.vertical, 2)
             }
         }
-        .padding(.top, 6)
+        .padding(Edge.Set.top, 6)
     }
 
     // MARK: - Summary (CENTERED)
@@ -329,7 +375,6 @@ struct InsightsHostView: View {
             summaryTileCentered(title: "Remaining", amount: remaining, emphasize: true)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
         .accessibilityElement(children: .combine)
     }
 
@@ -344,6 +389,43 @@ struct InsightsHostView: View {
         }
         .frame(maxWidth: .infinity)
         .multilineTextAlignment(.center)
+    }
+
+    // MARK: - Toolbar & Sheets
+
+    @ToolbarContentBuilder
+    private func exportToolbar() -> some ToolbarContent {
+        ToolbarItem(placement: .primaryAction) {
+            Menu {
+                Button("Export Upcoming (CSV)") {
+                    exportURL = CSVExporter.upcomingCSV(breakdowns: breakdownsSnap)
+                    showExport = true
+                }
+                Divider()
+                Button("Export Income (CSV)") {
+                    exportURL = CSVExporter.incomeCSV(incomes: incomeSources())
+                    showExport = true
+                }
+                Divider()
+                Button("Export All (CSV)") {
+                    exportURL = CSVExporter.allCSV(
+                        breakdowns: breakdownsSnap,
+                        bills: bills,
+                        incomes: incomeSources()
+                    )
+                    showExport = true
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func exportSheet() -> some View {
+        if let url = exportURL {
+            ShareSheet(activityItems: [url])
+        }
     }
 
     // MARK: - Utilities
@@ -362,20 +444,26 @@ struct InsightsHostView: View {
         f.minimumFractionDigits = 2
         return f.string(from: n) ?? "$0.00"
     }
-}
 
-// MARK: - Card Container (shared look: blurred, rounded, subtle border + shadow)
-private struct CardContainer<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        content
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.white.opacity(0.12))
-            )
-            .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 4)
+    // MARK: - Skeletons
+
+    private func skeletonTile(title: String) -> some View {
+        VStack(alignment: .center, spacing: 3) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.quaternary)
+                .frame(width: 84, height: 16)
+        }
+        .frame(maxWidth: .infinity)
+        .redacted(reason: .placeholder)
+    }
+
+    private func skeletonLine() -> some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(.quaternary)
+            .frame(height: 16)
+            .redacted(reason: .placeholder)
     }
 }

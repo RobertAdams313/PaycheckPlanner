@@ -1,20 +1,11 @@
 //
-//  CombinedPeriod.swift
-//  PaycheckPlanner
-//
-//  Created by Rob on 8/24/25.
-//  Copyright © 2025 Rob Adams. All rights reserved.
-//
-
-//
 //  CombinedPayEventsEngine.swift
 //  PaycheckPlanner
 //
-//  Rewritten to drive period generation from IncomeSchedule,
-//  fixing biweekly slicing and ensuring incomes are counted
-//  on each period end (payday).
+//  Overlap fix: default to merged grid when there’s more than one schedule (or only `.once`),
+//  and include incomes whose *pay period window* intersects each segment (start, end] (end-inclusive).
+//  Also honors a user-selected "main" IncomeSchedule to anchor the primary grid when available.
 //
-
 import Foundation
 import SwiftData
 
@@ -40,16 +31,6 @@ struct CombinedPeriod: Identifiable, Hashable {
 
 enum CombinedPayEventsEngine {
 
-    /// Build upcoming combined pay periods.
-    ///
-    /// If there is exactly **one recurring** income schedule (weekly/biweekly/monthly/semimonthly),
-    /// we use that schedule to define the period grid:
-    ///     [previous payday ≤ now] → [next payday ≥ now] → [next] → ...
-    ///
-    /// This guarantees the first period shown is the **current open period**.
-    /// We still include incomes from *all* schedules that pay exactly on each period `end` (payday).
-    ///
-    /// If there are multiple recurring schedules, we fall back to a merged-paydays method.
     static func combinedPeriods(
         schedules: [IncomeSchedule],
         count: Int,
@@ -57,16 +38,19 @@ enum CombinedPayEventsEngine {
         using cal: Calendar = Calendar(identifier: .gregorian)
     ) -> [CombinedPeriod] {
         guard count > 0 else { return [] }
-
         let lower = stripTime(startFrom, cal: cal)
-        let recurring = schedules.filter { $0.frequency != .once }
 
-        // Preferred path: single recurring schedule defines the grid.
-        if recurring.count == 1, let anchorSch = recurring.first {
-            return periodsUsingAnchor(anchorSch, allSchedules: schedules, count: count, lower: lower, cal: cal)
+        // Prefer an explicitly-marked "main" schedule if it exists and is recurring.
+        if let anchor = schedules.first(where: { $0.isMain && $0.frequency != .once }) {
+            return periodsUsingAnchor(anchor, allSchedules: schedules, count: count, lower: lower, cal: cal)
         }
 
-        // Fallback: merged-paydays method (works for multiple overlapping schedules).
+        // If there is exactly one recurring schedule, anchor to it.
+        if schedules.count == 1, let only = schedules.first, only.frequency != .once {
+            return periodsUsingAnchor(only, allSchedules: schedules, count: count, lower: lower, cal: cal)
+        }
+
+        // Otherwise, build a merged grid across all paydays.
         return periodsUsingMergedGrid(schedules: schedules, count: count, lower: lower, cal: cal)
     }
 
@@ -82,7 +66,6 @@ enum CombinedPayEventsEngine {
         guard let prev = previousPayday(for: anchor, atOrBefore: lower, cal: cal) else { return [] }
 
         var nexts = nextPaydays(for: anchor, count: count, from: lower, using: cal)
-        // Ensure we have enough bounds (prev + nexts >= count+1)
         while nexts.count < count, let last = nexts.last {
             let more = nextPaydays(for: anchor, count: 4, from: last, using: cal)
             if more.isEmpty { break }
@@ -98,9 +81,10 @@ enum CombinedPayEventsEngine {
             let end = bounds[i + 1]
 
             let incomes: [PeriodIncome] = allSchedules.compactMap { sch in
-                guard paysOn(end, schedule: sch, cal: cal),
-                      let src = sch.source else { return nil }
-                return PeriodIncome(source: src, amount: src.defaultAmount)
+                guard let src = sch.source else { return nil }
+                return scheduleOverlapsSegment(sch, start, end, cal: cal)
+                    ? PeriodIncome(source: src, amount: src.defaultAmount)
+                    : nil
             }
 
             periods.append(.init(start: start, end: end, payday: end, incomes: incomes))
@@ -108,7 +92,7 @@ enum CombinedPayEventsEngine {
         return periods
     }
 
-    // MARK: - Fallback merged grid (multiple recurring schedules)
+    // MARK: - Merged grid (multiple schedules OR only `.once`)
 
     private static func periodsUsingMergedGrid(
         schedules: [IncomeSchedule],
@@ -118,54 +102,41 @@ enum CombinedPayEventsEngine {
     ) -> [CombinedPeriod] {
 
         var merged: Set<Date> = []
-        var schedulePaydays: [ObjectIdentifier: [Date]] = [:]
-
         for sch in schedules {
-            let key = ObjectIdentifier(sch)
-            let prev = previousPayday(for: sch, atOrBefore: lower, cal: cal)
-            let nexts = nextPaydays(for: sch, count: count + 2, from: lower, using: cal)
-
-            if let p = prev { merged.insert(p) }
-            for d in nexts { merged.insert(d) }
-
-            schedulePaydays[key] = (prev.map { [$0] } ?? []) + nexts
+            if let p = previousPayday(for: sch, atOrBefore: lower, cal: cal) { merged.insert(p) }
+            for d in nextPaydays(for: sch, count: count + 2, from: lower, using: cal) { merged.insert(d) }
         }
 
-        var all = Array(merged).sorted()
-        guard !all.isEmpty else { return [] }
+        var bounds = Array(merged).sorted()
+        guard !bounds.isEmpty else { return [] }
 
-        // If the smallest merged date is AFTER lower, seed a previous bound from any schedule
-        if let first = all.first, first > lower {
+        if let first = bounds.first, first > lower {
             if let near = schedules.compactMap({ previousPayday(for: $0, atOrBefore: lower, cal: cal) }).max() {
-                all.insert(near, at: 0)
+                bounds.insert(near, at: 0)
             }
         }
 
         var periods: [CombinedPeriod] = []
-        for i in 1..<all.count {
-            let prev = all[i - 1]
-            let next = all[i]
+        for i in 1..<bounds.count {
+            let prev = bounds[i - 1]
+            let next = bounds[i]
 
             let incomes: [PeriodIncome] = schedules.compactMap { sch in
-                let key = ObjectIdentifier(sch)
-                if let list = schedulePaydays[key], list.contains(next),
-                   let src = sch.source {
-                    return PeriodIncome(source: src, amount: src.defaultAmount)
-                }
-                return nil
+                guard let src = sch.source else { return nil }
+                return scheduleOverlapsSegment(sch, prev, next, cal: cal)
+                    ? PeriodIncome(source: src, amount: src.defaultAmount)
+                    : nil
             }
 
             periods.append(.init(start: prev, end: next, payday: next, incomes: incomes))
             if periods.count >= count { break }
         }
 
-        // Extend if needed
+        // If we came up short, extend tail a bit further.
         if periods.count < count, let lastEnd = periods.last?.end {
             var tail: Set<Date> = []
             for sch in schedules {
-                for d in nextPaydays(for: sch, count: count + 4, from: lastEnd, using: cal) {
-                    tail.insert(d)
-                }
+                for d in nextPaydays(for: sch, count: count + 4, from: lastEnd, using: cal) { tail.insert(d) }
             }
             let sortedTail = Array(tail).sorted()
             var i = 1
@@ -174,12 +145,10 @@ enum CombinedPayEventsEngine {
                 let next = sortedTail[i]
 
                 let incomes: [PeriodIncome] = schedules.compactMap { sch in
-                    let key = ObjectIdentifier(sch)
-                    if let list = schedulePaydays[key], list.contains(next),
-                       let src = sch.source {
-                        return PeriodIncome(source: src, amount: src.defaultAmount)
-                    }
-                    return nil
+                    guard let src = sch.source else { return nil }
+                    return scheduleOverlapsSegment(sch, prev, next, cal: cal)
+                        ? PeriodIncome(source: src, amount: src.defaultAmount)
+                        : nil
                 }
 
                 if periods.last?.start != prev || periods.last?.end != next {
@@ -210,7 +179,13 @@ enum CombinedPayEventsEngine {
         case .monthly:
             return monthlyBackwards(anchor: sch.anchorDate, atOrBefore: lower, cal: cal)
         case .semimonthly:
-            return semiMonthlyBackwards(anchor: sch.anchorDate, d1: sch.semimonthlyFirstDay, d2: sch.semimonthlySecondDay, atOrBefore: lower, cal: cal)
+            return semiMonthlyBackwards(
+                anchor: sch.anchorDate,
+                d1: sch.semimonthlyFirstDay,
+                d2: sch.semimonthlySecondDay,
+                atOrBefore: lower,
+                cal: cal
+            )
         @unknown default:
             return nil
         }
@@ -234,35 +209,41 @@ enum CombinedPayEventsEngine {
             let day = cal.component(.day, from: sch.anchorDate)
             return strideMonthly(anchor: sch.anchorDate, day: day, atOrAfter: lower, count: count, cal: cal)
         case .semimonthly:
-            return strideSemiMonthly(anchor: sch.anchorDate, d1: sch.semimonthlyFirstDay, d2: sch.semimonthlySecondDay, atOrAfter: lower, count: count, cal: cal)
+            return strideSemiMonthly(
+                anchor: sch.anchorDate,
+                d1: sch.semimonthlyFirstDay,
+                d2: sch.semimonthlySecondDay,
+                atOrAfter: lower,
+                count: count,
+                cal: cal
+            )
         @unknown default:
             return []
         }
     }
 
-    // MARK: - “Does this schedule pay on this date?”
+    // MARK: - Inclusion helper (end-inclusive)
 
-    private static func paysOn(_ date: Date, schedule sch: IncomeSchedule, cal: Calendar) -> Bool {
-        let d = stripTime(date, cal: cal)
-        let a = stripTime(sch.anchorDate, cal: cal)
-
+    /// True if the schedule has a payday inside the segment (start, end].
+    /// - (start, end] assigns the exact end-day payday to THIS card and avoids gaps at boundaries.
+    private static func scheduleOverlapsSegment(
+        _ sch: IncomeSchedule,
+        _ segStart: Date,
+        _ segEnd: Date,
+        cal: Calendar
+    ) -> Bool {
         switch sch.frequency {
         case .once:
-            return d == a
-        case .weekly:
-            if let delta = cal.dateComponents([.day], from: a, to: d).day { return delta >= 0 && delta % 7 == 0 }
-            return false
-        case .biweekly:
-            if let delta = cal.dateComponents([.day], from: a, to: d).day { return delta >= 0 && delta % 14 == 0 }
-            return false
-        case .monthly:
-            let anchorDay = max(1, min(28, cal.component(.day, from: a)))
-            return cal.component(.day, from: d) == anchorDay
-        case .semimonthly:
-            let ad1 = max(1, min(28, sch.semimonthlyFirstDay))
-            let ad2 = max(1, min(28, sch.semimonthlySecondDay))
-            let dd = cal.component(.day, from: d)
-            return dd == ad1 || dd == ad2
+            let d = cal.startOfDay(for: sch.anchorDate)
+            return d > segStart && d <= segEnd
+
+        case .weekly, .biweekly, .monthly, .semimonthly:
+            guard let lastPaydayUpToEnd = previousPayday(for: sch, atOrBefore: segEnd, cal: cal) else {
+                return false
+            }
+            // include if its most recent payday up to segEnd is strictly after segStart
+            return lastPaydayUpToEnd > segStart
+
         @unknown default:
             return false
         }
@@ -279,17 +260,10 @@ enum CombinedPayEventsEngine {
     ) -> [Date] {
         var occurrences: [Date] = []
         var d = stripTime(anchor, cal: cal)
-
-        // advance to the first occurrence >= lower
-        while d < lower {
-            guard let nd = cal.date(byAdding: .day, value: days, to: d) else { break }
-            d = nd
-        }
-        // collect
+        while d < lower { d = cal.date(byAdding: .day, value: days, to: d) ?? d }
         while occurrences.count < count {
             occurrences.append(stripTime(d, cal: cal))
-            guard let nd = cal.date(byAdding: .day, value: days, to: d) else { break }
-            d = nd
+            d = cal.date(byAdding: .day, value: days, to: d) ?? d
         }
         return occurrences
     }
@@ -302,7 +276,6 @@ enum CombinedPayEventsEngine {
         cal: Calendar
     ) -> [Date] {
         let dayClamped = max(1, min(28, day))
-        // start from the 1st of the month for `lower`
         let startMonth = firstOfMonth(for: lower, cal: cal)
         var cursor = startMonth
         var out: [Date] = []
@@ -312,8 +285,7 @@ enum CombinedPayEventsEngine {
                 let c = stripTime(candidate, cal: cal)
                 if c >= stripTime(lower, cal: cal) { out.append(c) }
             }
-            guard let next = cal.date(byAdding: .month, value: 1, to: cursor) else { break }
-            cursor = next
+            cursor = cal.date(byAdding: .month, value: 1, to: cursor) ?? cursor
         }
         return out
     }
@@ -341,8 +313,7 @@ enum CombinedPayEventsEngine {
                     }
                 }
             }
-            guard let next = cal.date(byAdding: .month, value: 1, to: cursor) else { break }
-            cursor = next
+            cursor = cal.date(byAdding: .month, value: 1, to: cursor) ?? cursor
         }
         return out
     }
@@ -352,17 +323,13 @@ enum CombinedPayEventsEngine {
     private static func strideBackwardsDays(anchor: Date, every days: Int, atOrBefore lower: Date, cal: Calendar) -> Date? {
         var d = stripTime(anchor, cal: cal)
         if d > lower {
-            while d > lower {
-                guard let nd = cal.date(byAdding: .day, value: -days, to: d) else { break }
-                d = nd
-            }
+            while d > lower { d = cal.date(byAdding: .day, value: -days, to: d) ?? d }
             return d <= lower ? d : nil
         } else {
             var prev = d
             while d <= lower {
                 prev = d
-                guard let nd = cal.date(byAdding: .day, value: days, to: d) else { break }
-                d = nd
+                d = cal.date(byAdding: .day, value: days, to: d) ?? d
             }
             return prev
         }
@@ -382,7 +349,14 @@ enum CombinedPayEventsEngine {
         return nil
     }
 
-    private static func semiMonthlyBackwards(anchor: Date, d1: Int, d2: Int, atOrBefore lower: Date, cal: Calendar) -> Date? {
+    /// Helper for semimonthly `previousPayday`.
+    private static func semiMonthlyBackwards(
+        anchor: Date,
+        d1: Int,
+        d2: Int,
+        atOrBefore lower: Date,
+        cal: Calendar
+    ) -> Date? {
         let days = [max(1, min(28, d1)), max(1, min(28, d2))].sorted()
         let thisMonth = firstOfMonth(for: lower, cal: cal)
 
@@ -422,8 +396,6 @@ enum CombinedPayEventsEngine {
 // MARK: - Notifications-friendly helpers
 
 extension CombinedPayEventsEngine {
-    /// Build **upcoming** breakdowns (periods + bills allocated) for notifications/badges.
-    /// Start from `from` (default now), return `count` periods forward.
     @MainActor
     static func upcomingBreakdowns(
         context: ModelContext,
@@ -431,11 +403,8 @@ extension CombinedPayEventsEngine {
         from: Date = .now,
         calendar: Calendar = .current
     ) -> [CombinedBreakdown] {
-        // Fetch inputs
         let schedules: [IncomeSchedule] = (try? context.fetch(FetchDescriptor<IncomeSchedule>())) ?? []
         let bills: [Bill] = (try? context.fetch(FetchDescriptor<Bill>())) ?? []
-
-        // Build periods then allocate bills
         let periods = CombinedPayEventsEngine.combinedPeriods(
             schedules: schedules,
             count: max(1, count),
@@ -445,7 +414,6 @@ extension CombinedPayEventsEngine {
         return SafeAllocationEngine.allocate(bills: bills, into: periods, calendar: calendar)
     }
 
-    /// Alias to match older call sites used in NotifyKeys.swift.
     @MainActor
     static func combinedBreakdownsForUpcoming(
         context: ModelContext,

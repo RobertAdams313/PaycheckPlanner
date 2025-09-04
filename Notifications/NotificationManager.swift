@@ -2,251 +2,269 @@
 //  NotificationManager.swift
 //  PaycheckPlanner
 //
-//  Created by Rob on 9/2/25.
-//  Purpose: Central place to (re)schedule local notifications based on Settings.
-//           Uses your CombinedPayEventsEngine + SafeAllocationEngine.
+//  Built to your current engine stack:
+//  - Uses CombinedPayEventsEngine.upcomingBreakdowns(context:count:from:calendar:)
+//  - Builds notification IDs with SharedAppGroup.billID(name, dueDate)
+//  - Respects simple UserDefaults toggles for bill/income notifications
 //
 
 import Foundation
-import SwiftData
 import UserNotifications
+import SwiftData
 
-// MARK: - Public entry point
+enum NotificationManager {
 
-@MainActor
-func rescheduleNotifications(using context: ModelContext) async {
-    let defaults = UserDefaults.standard
-    let paydayOn = defaults.bool(forKey: "paydayNotifications")
-    let billOn   = defaults.bool(forKey: "billDueNotifications")
-    let leadDays = max(0, defaults.integer(forKey: "billReminderDays"))
+    // MARK: - Public API
 
-    // Ask once if needed
-    NotificationScheduler.requestAuthorizationIfNeeded()
-
-    // Clear our previously scheduled requests
-    NotificationScheduler.removeAllScheduled(matching: "payday_")
-    NotificationScheduler.removeAllScheduled(matching: "billdue_")
-
-    guard paydayOn || billOn else { return }
-
-    // Fetch SwiftData explicitly (no generic constraints issues)
-    let schedules: [IncomeSchedule] = (try? context.fetch(FetchDescriptor<IncomeSchedule>())) ?? []
-    let bills: [Bill]               = (try? context.fetch(FetchDescriptor<Bill>())) ?? []
-
-    // Build current + future periods and allocate bills
-    // Show the current open period + 8 upcoming
-    let periods = CombinedPayEventsEngine.combinedPeriods(
-        schedules: schedules,
-        count: 9
-    )
-    let breakdowns = SafeAllocationEngine.allocate(bills: bills, into: periods)
-
-    if paydayOn {
-        schedulePaydayNotifications(from: breakdowns)
+    /// Ask for permission if not determined.
+    static func requestAuthorizationIfNeeded() async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .notDetermined else { return }
+        _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
     }
 
-    if billOn {
-        scheduleBillDueNotifications(from: bills, leadDays: leadDays)
+    /// Rebuild all upcoming notifications (bills + payday).
+    @MainActor
+    static func rebuildAllNotifications(
+        context: ModelContext,
+        count: Int = 3,
+        calendar: Calendar = .current
+    ) async {
+        await requestAuthorizationIfNeeded()
+        await cancelAllScheduled()
+
+        let billsOn = (UserDefaults.standard.object(forKey: "notifyBillsEnabled") as? Bool) ?? true
+        let incomeOn = (UserDefaults.standard.object(forKey: "notifyIncomeEnabled") as? Bool) ?? true
+
+        if billsOn {
+            await scheduleUpcomingBills(context: context, count: count, calendar: calendar)
+        }
+        if incomeOn {
+            await scheduleNextPaydays(context: context, count: count, calendar: calendar)
+        }
     }
-}
 
-// MARK: - Payday notifications
+    /// Cancel everything we scheduled.
+    static func cancelAllScheduled() async {
+        let center = UNUserNotificationCenter.current()
+        await center.removeAllPendingNotificationRequests()
+    }
 
-private func schedulePaydayNotifications(from breakdowns: [CombinedBreakdown]) {
-    let cal = Calendar.current
-    let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+    // MARK: - Bills
 
-    for b in breakdowns {
-        // Fire at 9:00 AM local on payday
-        guard let fire = cal.date(bySettingHour: 9, minute: 0, second: 0, of: b.period.payday),
-              fire >= Date() else { continue }
+    /// Schedule bill notifications for the next N breakdown periods.
+    @MainActor
+    static func scheduleUpcomingBills(
+        context: ModelContext,
+        count: Int,
+        calendar: Calendar = .current
+    ) async {
+        let center = UNUserNotificationCenter.current()
 
-        // Build body text without relying on Decimal extensions (avoid collisions)
-        let income = formatCurrency(b.incomeTotal)
-        let bills  = formatCurrency(b.billsTotal)
-        let remain = formatCurrency(b.incomeTotal + b.carryIn - b.billsTotal)
-
-        let id = "payday_" + df.string(from: b.period.payday) // stable, prevents dupes
-        NotificationScheduler.scheduleOneShot(
-            id: id,
-            title: "Payday",
-            body: "Income: \(income) • Bills: \(bills) • Remaining: \(remain)",
-            fireDate: fire
+        // Build breakdowns with your convenience (periods -> allocation already applied).
+        let breakdowns = CombinedPayEventsEngine.upcomingBreakdowns(
+            context: context,
+            count: count,
+            from: Date(),
+            calendar: calendar
         )
-    }
-}
 
-// MARK: - Bill-due notifications
+        for breakdown in breakdowns {
+            // For each allocated bill line, schedule once at its due day (start-of-day).
+            for line in breakdown.items {
+                let bill = line.bill
 
-private func scheduleBillDueNotifications(from bills: [Bill], leadDays: Int) {
-    let cal = Calendar.current
-    let now = Date()
-    let horizon = cal.date(byAdding: .month, value: 3, to: now) ?? now.addingTimeInterval(60 * 60 * 24 * 90)
-    let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+                // Derive due dates in this [start,end) window according to recurrence.
+                let dues = dueDates(
+                    for: bill,
+                    in: breakdown.period.start,
+                    breakdown.period.end,
+                    cal: calendar
+                )
+                for due in dues {
+                    let id = SharedAppGroup.billID(bill.name, due)
+                    let title = bill.name
+                    let amountStr = currencyString(bill.amount)
+                    let body = "Due today • \(amountStr)"
 
-    for bill in bills {
-        let dueDates = upcomingDueDates(for: bill, from: now, through: horizon, calendar: cal)
-        for due in dueDates {
-            // Fire at 9:00 AM leadDays before the due date (or same day if 0)
-            let fireBase = cal.date(byAdding: .day, value: -leadDays, to: due) ?? due
-            guard let fire = cal.date(bySettingHour: 9, minute: 0, second: 0, of: fireBase),
-                  fire >= now else { continue }
-
-            let pretty = dateMediumString(due)
-            let id = "billdue_" + safeSlug(bill.name) + "_" + df.string(from: due)
-
-            NotificationScheduler.scheduleOneShot(
-                id: id,
-                title: "Bill due soon",
-                body: "\(bill.name.isEmpty ? "Untitled Bill" : bill.name) is due \(pretty).",
-                fireDate: fire
-            )
+                    // Fire at 9am local time on the due date (tweak if desired).
+                    if let triggerDate = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: due) {
+                        await scheduleLocalNotification(
+                            id: "bill|\(id)",
+                            title: title,
+                            body: body,
+                            triggerAt: triggerDate
+                        )
+                    }
+                }
+            }
         }
     }
-}
 
-// MARK: - Recurrence → due dates (pure helpers)
+    // MARK: - Paydays
 
-private func upcomingDueDates(for bill: Bill,
-                              from: Date,
-                              through: Date,
-                              calendar cal: Calendar) -> [Date] {
-    var out: [Date] = []
-    // Start at the first occurrence >= max(anchor, from)
-    guard var current = firstOccurrence(onOrAfter: max(from, bill.anchorDueDate),
-                                       anchor: bill.anchorDueDate,
-                                       recurrence: bill.recurrence,
-                                       calendar: cal) else { return out }
+    /// Schedule payday notifications for the next N breakdown periods.
+    @MainActor
+    static func scheduleNextPaydays(
+        context: ModelContext,
+        count: Int,
+        calendar: Calendar = .current
+    ) async {
+        let center = UNUserNotificationCenter.current()
 
-    while current <= through {
-        out.append(current)
-        current = nextOccurrence(after: current, recurrence: bill.recurrence, calendar: cal)
-    }
-    return out
-}
+        let breakdowns = CombinedPayEventsEngine.upcomingBreakdowns(
+            context: context,
+            count: count,
+            from: Date(),
+            calendar: calendar
+        )
 
-private func firstOccurrence(onOrAfter date: Date,
-                             anchor: Date,
-                             recurrence: BillRecurrence,
-                             calendar cal: Calendar) -> Date? {
-    let date = cal.startOfDay(for: date)
-    let anchor = cal.startOfDay(for: anchor)
-
-    if date <= anchor { return anchor }
-
-    switch recurrence {
-    case .once:
-        return nil
-    case .weekly:
-        return alignForward(anchor: anchor, stepDays: 7, onOrAfter: date, cal: cal)
-    case .biweekly:
-        return alignForward(anchor: anchor, stepDays: 14, onOrAfter: date, cal: cal)
-    case .monthly:
-        let day = max(1, min(28, cal.component(.day, from: anchor)))
-        return nextMonthly(onOrAfter: date, day: day, cal: cal)
-    case .semimonthly:
-        // Generic: 15 + 30; if you store custom d1/d2, swap here.
-        return nextSemiMonthly(onOrAfter: date, firstDay: 15, secondDay: 30, cal: cal)
-    }
-}
-
-private func nextOccurrence(after d: Date,
-                            recurrence: BillRecurrence,
-                            calendar cal: Calendar) -> Date {
-    switch recurrence {
-    case .once:
-        return d.addingTimeInterval(10 * 365 * 24 * 3600)
-    case .weekly:
-        return cal.date(byAdding: .day, value: 7, to: d).map(cal.startOfDay(for:)) ?? d
-    case .biweekly:
-        return cal.date(byAdding: .day, value: 14, to: d).map(cal.startOfDay(for:)) ?? d
-    case .monthly:
-        let day = cal.component(.day, from: d)
-        let next = cal.date(byAdding: .month, value: 1, to: d) ?? d
-        let y = cal.component(.year, from: next)
-        let m = cal.component(.month, from: next)
-        let clamped = min(day, daysInMonth(year: y, month: m, cal: cal))
-        return makeDate(year: y, month: m, day: clamped, cal: cal)
-    case .semimonthly:
-        let dd = cal.component(.day, from: d)
-        if dd <= 15 {
-            let y = cal.component(.year, from: d)
-            let m = cal.component(.month, from: d)
-            let target = min(30, daysInMonth(year: y, month: m, cal: cal))
-            return makeDate(year: y, month: m, day: target, cal: cal)
-        } else {
-            let next = cal.date(byAdding: .month, value: 1, to: d) ?? d
-            let y = cal.component(.year, from: next)
-            let m = cal.component(.month, from: next)
-            return makeDate(year: y, month: m, day: 15, cal: cal)
+        for b in breakdowns {
+            let title = "Payday"
+            let body = "Income: \(currencyString(b.incomeTotal)) • Bills: \(currencyString(b.billsTotal)) • Leftover: \(currencyString(b.leftover))"
+            // Notify morning of payday.
+            if let morning = calendar.date(bySettingHour: 8, minute: 0, second: 0, of: b.period.payday) {
+                let id = paydayID(for: b.period.payday)
+                await scheduleLocalNotification(
+                    id: "payday|\(id)",
+                    title: title,
+                    body: body,
+                    triggerAt: morning
+                )
+            }
         }
     }
-}
 
-// MARK: - Date utilities
+    // MARK: - Low-level scheduling
 
-private func alignForward(anchor: Date, stepDays: Int, onOrAfter lower: Date, cal: Calendar) -> Date {
-    var d = anchor
-    while d < lower {
-        d = cal.date(byAdding: .day, value: stepDays, to: d) ?? d.addingTimeInterval(Double(stepDays) * 86400)
+    private static func scheduleLocalNotification(
+        id: String,
+        title: String,
+        body: String,
+        triggerAt: Date
+    ) async {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: triggerAt)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let req = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        do {
+            try await UNUserNotificationCenter.current().add(req)
+        } catch {
+            #if DEBUG
+            print("Failed to schedule \(id): \(error)")
+            #endif
+        }
     }
-    return cal.startOfDay(for: d)
-}
 
-private func nextMonthly(onOrAfter date: Date, day: Int, cal: Calendar) -> Date? {
-    let y = cal.component(.year, from: date)
-    let m = cal.component(.month, from: date)
-    let d = cal.component(.day, from: date)
-    if d <= day, day <= daysInMonth(year: y, month: m, cal: cal) {
-        return makeDate(year: y, month: m, day: day, cal: cal)
+    // MARK: - Helpers
+
+    /// Bill-specific due dates inside [start, end).
+    /// Matches SafeAllocationEngine rules (anchor clamp / endDate stop).
+    private static func dueDates(
+        for bill: Bill,
+        in start: Date,
+        _ end: Date,
+        cal: Calendar
+    ) -> [Date] {
+        // Mirror the allocation rules to derive concrete due days.
+        let anchor = cal.startOfDay(for: bill.anchorDueDate)
+        let lower = max(cal.startOfDay(for: start), anchor)
+
+        var upper = end
+        if let until = bill.endDate {
+            let dayAfter = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: until)) ?? until
+            upper = min(upper, dayAfter)
+        }
+        if upper <= lower { return [] }
+
+        switch bill.recurrence {
+        case .once:
+            let d = cal.startOfDay(for: bill.anchorDueDate)
+            return (d >= lower && d < upper) ? [d] : []
+
+        case .weekly:
+            return strideDays(anchor: anchor, every: 7, atOrAfter: lower, before: upper, cal: cal)
+
+        case .biweekly:
+            return strideDays(anchor: anchor, every: 14, atOrAfter: lower, before: upper, cal: cal)
+
+        case .monthly:
+            let day = cal.component(.day, from: bill.anchorDueDate)
+            return strideMonthly(days: [day], atOrAfter: lower, before: upper, cal: cal)
+
+        case .semimonthly:
+            // Default common pattern without per-bill days: 1 & 15
+            return strideMonthly(days: [1, 15], atOrAfter: lower, before: upper, cal: cal)
+        }
     }
-    let next = cal.date(byAdding: .month, value: 1, to: date) ?? date
-    let y2 = cal.component(.year, from: next)
-    let m2 = cal.component(.month, from: next)
-    let clamped = min(day, daysInMonth(year: y2, month: m2, cal: cal))
-    return makeDate(year: y2, month: m2, day: clamped, cal: cal)
+
+    private static func strideDays(
+        anchor: Date,
+        every days: Int,
+        atOrAfter lower: Date,
+        before upper: Date,
+        cal: Calendar
+    ) -> [Date] {
+        var out: [Date] = []
+        let lowerDay = cal.startOfDay(for: lower)
+        var d = cal.startOfDay(for: anchor)
+        while d < lowerDay { d = cal.date(byAdding: .day, value: days, to: d) ?? d }
+        while d < upper {
+            out.append(cal.startOfDay(for: d))
+            d = cal.date(byAdding: .day, value: days, to: d) ?? d
+        }
+        return out
+    }
+
+    private static func strideMonthly(
+        days: [Int],
+        atOrAfter lower: Date,
+        before upper: Date,
+        cal: Calendar
+    ) -> [Date] {
+        var out: [Date] = []
+        var comps = cal.dateComponents([.year, .month], from: lower)
+
+        while true {
+            guard let y = comps.year, let m = comps.month, let monthStart = cal.date(from: comps) else { break }
+            // Use half-open Range and compute the last valid day correctly
+            let range: Range<Int> = cal.range(of: .day, in: .month, for: monthStart) ?? (1..<29)
+            let firstDay = range.lowerBound
+            let lastDay  = range.upperBound - 1
+
+            for d in days.sorted() {
+                let dd = max(firstDay, min(lastDay, d))
+                if let candidate = cal.date(from: DateComponents(year: y, month: m, day: dd)) {
+                    let c = cal.startOfDay(for: candidate)
+                    if c >= cal.startOfDay(for: lower), c < upper {
+                        out.append(c)
+                    }
+                }
+            }
+
+            guard let nextMonth = cal.date(byAdding: .month, value: 1, to: monthStart), nextMonth < upper else {
+                break
+            }
+            comps = cal.dateComponents([.year, .month], from: nextMonth)
+        }
+        return out
+    }
+
+    private static func paydayID(for date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return "y\(c.year ?? 0)m\(c.month ?? 0)d\(c.day ?? 0)"
+    }
+
+    private static func currencyString(_ amount: Decimal) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.minimumFractionDigits = 2
+        f.maximumFractionDigits = 2
+        return f.string(from: amount as NSDecimalNumber) ?? "$0.00"
+    }
 }
-
-private func nextSemiMonthly(onOrAfter date: Date, firstDay: Int, secondDay: Int, cal: Calendar) -> Date? {
-    let y = cal.component(.year, from: date)
-    let m = cal.component(.month, from: date)
-    let d = cal.component(.day, from: date)
-    let first = min(firstDay, daysInMonth(year: y, month: m, cal: cal))
-    let second = min(secondDay, daysInMonth(year: y, month: m, cal: cal))
-
-    if d <= first  { return makeDate(year: y, month: m, day: first, cal: cal) }
-    if d <= second { return makeDate(year: y, month: m, day: second, cal: cal) }
-
-    let next = cal.date(byAdding: .month, value: 1, to: date) ?? date
-    let y2 = cal.component(.year, from: next)
-    let m2 = cal.component(.month, from: next)
-    return makeDate(year: y2, month: m2, day: first, cal: cal)
-}
-
-private func daysInMonth(year: Int, month: Int, cal: Calendar) -> Int {
-    var comps = DateComponents(); comps.year = year; comps.month = month
-    let dt = cal.date(from: comps) ?? Date()
-    return cal.range(of: .day, in: .month, for: dt)?.count ?? 30
-}
-
-private func makeDate(year: Int, month: Int, day: Int, cal: Calendar) -> Date {
-    var comps = DateComponents(); comps.year = year; comps.month = month; comps.day = day
-    return cal.startOfDay(for: cal.date(from: comps) ?? Date())
-}
-
-// MARK: - Formatting (keep local to avoid extension collisions)
-
-private func safeSlug(_ s: String) -> String {
-    s.replacingOccurrences(of: " ", with: "_")
-     .replacingOccurrences(of: "/", with: "-")
-     .replacingOccurrences(of: ":", with: "-")
-}
-
-private func dateMediumString(_ d: Date) -> String {
-    let f = DateFormatter()
-    f.dateStyle = .medium
-    f.timeStyle = .none
-    return f.string(from: d)
-}
-
-

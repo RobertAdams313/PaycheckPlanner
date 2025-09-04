@@ -97,7 +97,7 @@ enum SafeAllocationEngine {
     ) -> Int {
         // Clamp lower bound to anchor day (no occurrences before anchor)
         let anchor = cal.startOfDay(for: bill.anchorDueDate)
-        var lower = max(cal.startOfDay(for: start), anchor)
+        let lower = max(cal.startOfDay(for: start), anchor)
 
         // Clamp upper bound to day-after endDate if provided
         var upper = end
